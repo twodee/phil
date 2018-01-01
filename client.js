@@ -278,7 +278,7 @@ class Image {
            this.bytes[start + 3] == color[3];
   }
 
-  fill(c, r, color) {
+  fill(c, r, color, isDiagonal = false) {
     let oldColor = this.get(c, r);
     let newColor = color.slice(0);
 
@@ -302,6 +302,20 @@ class Image {
       let spanAbove = false;
       let spanBelow = false;
 
+      if (isDiagonal && cc > 0) {
+        // Look up and left for diagonal.
+        if (rr > 0 && this.isPixel(cc - 1, rr - 1, oldColor)) {
+          stack.push([cc - 1, rr - 1]);
+          spanAbove = true;
+        }
+
+        // Look down and left for diagonal.
+        if (rr < this.height - 1 && this.isPixel(cc - 1, rr + 1, oldColor)) {
+          stack.push([cc - 1, rr + 1]);
+          spanBelow = true;
+        }
+      }
+
       while (cc < this.width && this.isPixel(cc, rr, oldColor)) {
         this.set(cc, rr, newColor);
         history.current.add(cc, rr, newColor.slice(0));
@@ -321,6 +335,16 @@ class Image {
         }
 
         ++cc;
+      }
+
+      if (isDiagonal && cc < this.width - 1) {
+        if (!spanAbove && rr > 0 && this.isPixel(cc + 1, rr - 1, oldColor)) {
+          stack.push([cc + 1, rr - 1]);
+        }
+
+        if (!spanBelow && rr < this.height - 1 && this.isPixel(cc + 1, rr + 1, oldColor)) {
+          stack.push([cc + 1, rr + 1]);
+        }
       }
     }
   }
@@ -672,7 +696,7 @@ function onMouseUp(e) {
     let newMouseAt = mouseToPixels(e.clientX, e.clientY);
     if (isOverImage(newMouseAt)) {
       history.begin(new UndoablePixels());
-      image.fill(newMouseAt.x, newMouseAt.y, selectedColor);
+      image.fill(newMouseAt.x, newMouseAt.y, selectedColor, e.shiftKey);
       render();
     }
   }
