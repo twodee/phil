@@ -261,13 +261,68 @@ class Image {
   }
 
   get(c, r) {
-    var start = (r * this.width + c) * 4;
+    let start = (r * this.width + c) * 4;
     return [
       this.bytes[start + 0],
       this.bytes[start + 1],
       this.bytes[start + 2],
       this.bytes[start + 3],
     ];
+  }
+
+  isPixel(c, r, color) {
+    let start = (r * this.width + c) * 4;
+    return this.bytes[start + 0] == color[0] &&
+           this.bytes[start + 1] == color[1] &&
+           this.bytes[start + 2] == color[2] &&
+           this.bytes[start + 3] == color[3];
+  }
+
+  fill(c, r, color) {
+    let oldColor = this.get(c, r);
+    let newColor = color.slice(0);
+
+    // Bail if this pixel is already the fill color.
+    if (this.isPixel(c, r, newColor)) {
+      return;
+    }
+
+    let stack = [];
+    stack.push([c, r]);
+
+    while (stack.length > 0) {
+      let [cc, rr] = stack.pop();
+
+      // Move cc as far left as possible.
+      while (cc >= 0 && this.isPixel(cc, rr, oldColor)) {
+        --cc;
+      }
+      ++cc;
+
+      let spanAbove = false;
+      let spanBelow = false;
+
+      while (cc < this.width && this.isPixel(cc, rr, oldColor)) {
+        this.set(cc, rr, newColor);
+        history.current.add(cc, rr, newColor.slice(0));
+
+        if (!spanAbove && rr > 0 && this.isPixel(cc, rr - 1, oldColor)) {
+          stack.push([cc, rr - 1]);
+          spanAbove = true;
+        } else if (spanAbove && rr > 0 && !this.isPixel(cc, rr - 1, oldColor)) {
+          spanAbove = false;
+        }
+
+        if (!spanBelow && rr < this.height - 1 && this.isPixel(cc, rr + 1, oldColor)) {
+          stack.push([cc, rr + 1]);
+          spanBelow = true;
+        } else if (spanBelow && rr < this.height - 1 && !this.isPixel(cc, rr + 1, oldColor)) {
+          spanBelow = false;
+        }
+
+        ++cc;
+      }
+    }
   }
 
   get width() {
@@ -586,11 +641,6 @@ function drawLine(from, to) {
 }
 
 function onMouseDown(e) {
-  if (e.buttons == 1) {
-    // selectedColor = [0, 0, 0, 255];
-  // } else {
-    // selectedColor = [0, 0, 0, Math.round(0.1 * 255)];
-  }
   mouseAt = mouseToPixels(e.clientX, e.clientY);
 
   if (activeToolDiv == tools.pencil) {
@@ -618,6 +668,15 @@ function selectColor(rgba) {
 }
 
 function onMouseUp(e) {
+  if (activeToolDiv == tools.bucket) {
+    let newMouseAt = mouseToPixels(e.clientX, e.clientY);
+    if (isOverImage(newMouseAt)) {
+      history.begin(new UndoablePixels());
+      image.fill(newMouseAt.x, newMouseAt.y, selectedColor);
+      render();
+    }
+  }
+
   history.commit();
   lockAxis = null;
 }
@@ -722,6 +781,16 @@ function registerCallbacks() {
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mouseup', onMouseUp);
+
+  window.addEventListener('keydown', e => {
+    if (e.key == 'p') {
+      activateTool(tools.pencil);
+    } else if (e.key == 'e') {
+      activateTool(tools.eyedropper);
+    } else if (e.key == 'b') {
+      activateTool(tools.bucket);
+    }
+  });
 }
 
 function activateTool(div) {
