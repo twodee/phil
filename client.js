@@ -7,14 +7,12 @@ let tools = {};
 
 // Undos
 let undosList;
-let currentUndoable = null;
-let undos = [];
-let undoId = 0;
+let history;
 
 // Color
 let rgbWidgets;
 let channelsRoot;
-let color = [0, 255, 0, 255];
+let selectedColor = [0, 255, 0, 255];
 
 let lockAxis = null;
 
@@ -42,6 +40,119 @@ let imagePath;
 let image;
 let mouseAt;
 
+class UndoHistory {
+  constructor(image) {
+    this.latestId = 0;
+    this.current = null;
+    this.undos = [];
+    this.original = image;
+  }
+
+  commit() {
+    if (!this.current) return;
+
+    this.current.id = this.latestId;
+    ++this.latestId;
+
+    let div = document.createElement('div');
+    let id = this.current.id;
+
+    div.classList.add('undoEntry');
+    div.id = `undo${id}`;
+    div.innerHTML = `<input type="checkbox" class="column0" checked><span class="column1">${this.current.getLabel()}</span><span class="column2">\u2715</span>`;
+    undosList.insertBefore(div, undosList.firstChild);
+
+    let checkbox = document.querySelector(`#${div.id} input[type="checkbox"]`);
+    checkbox.addEventListener('click', e => {
+      if (checkbox.checked) {
+        this.redo(id, e.shiftKey);
+      } else {
+        this.undo(id, e.shiftKey);
+      }
+    });
+
+    let deleteButton = document.querySelector(`#${div.id} > .column2`);
+    deleteButton.addEventListener('click', e => {
+      this.remove(id, e.shiftKey);
+    });
+
+    this.current.checkbox = checkbox;
+    this.current.div = div;
+    this.undos.push(this.current);
+    this.current = null;
+  }
+
+  begin(undoable) {
+    this.current = undoable;
+  }
+
+  indexOf(id) {
+    for (let i = this.undos.length - 1; i >= 0; --i) {
+      if (this.undos[i].id == id) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  modify(id, includeSuccessors, state) {
+    for (let i = this.undos.length - 1; i >= 0; --i) {
+      if (this.undos[i].id == id || includeSuccessors) {
+        this.undos[i].checkbox.checked = state;
+        this.undos[i].isDone = state;
+        this.undos[i].setPixelsToLatest(history);
+      }
+
+      if (this.undos[i].id == id) {
+        break;
+      }
+    }
+
+    render();
+  }
+
+  remove(id, includeSuccessors) {
+    this.modify(id, includeSuccessors, false);
+
+    let i;
+    for (i = this.undos.length - 1; i >= 0; --i) {
+      if (this.undos[i].id == id || includeSuccessors) {
+        undosList.removeChild(this.undos[i].div);
+      }
+
+      if (this.undos[i].id == id) {
+        break;
+      }
+    }
+
+    if (includeSuccessors) {
+      this.undos.splice(i, this.undos.length - i);
+    } else {
+      this.undos.splice(i, 1);
+    }
+  }
+
+  undo(id, includeSuccessors) {
+    this.modify(id, includeSuccessors, false);
+  }
+
+  redo(id, includeSuccessors) {
+    this.modify(id, includeSuccessors, true);
+  }
+
+  getMostRecentColor(c, r) {
+    for (let i = this.undos.length - 1; i >= 0; --i) {
+      if (this.undos[i].isDone) {
+        let color = this.undos[i].getColor(c, r);
+        if (color) {
+          return color;
+        }
+      }
+    }
+    return this.original.get(c, r);
+  }
+}
+
 class Undoable {
   constructor(id) {
     this.id = id;
@@ -49,6 +160,9 @@ class Undoable {
     this.isDone = true;
     this.checkbox = null;
     this.div = null;
+  }
+
+  setPixelsToLatest(history) {
   }
 
   getLabel() {
@@ -80,22 +194,7 @@ class Undoable {
     return label;
   }
 
-  undo(image) {
-  }
-
-  redo(image) {
-  }
-
-  unapply(image) {
-    if (this.isDone) {
-      this.undo(image);
-    }
-  }
-
-  reapply(image) {
-    if (this.isDone) {
-      this.redo(image);
-    }
+  getColor(c, r) {
   }
 }
 
@@ -105,29 +204,30 @@ class UndoablePixels extends Undoable {
     this.pixels = new Map();
   }
 
+  setPixelsToLatest(history) {
+    for (let pixel of this.pixels.values()) {
+      image.set(pixel.x, pixel.y, history.getMostRecentColor(pixel.x, pixel.y));
+    }
+  }
+
   getLabel() {
     let label = this.pixels.length == 1 ? 'pixel' : 'pixels';
     return super.getLabel() + ' (' + this.pixels.size + ' ' + label + ')';
   }
 
-  add(x, y, oldColor, newColor) {
+  add(x, y, color) {
     let key = x + ',' + y;
     if (this.pixels.has(key)) {
-      this.pixels.get(key).newColor = newColor;
+      this.pixels.get(key).color = color;
     } else {
-      this.pixels.set(key, {x: x, y: y, oldColor: oldColor, newColor: newColor});
+      this.pixels.set(key, {x: x, y: y, color: color});
     }
   }
 
-  undo(image) {
-    for (let pixel of this.pixels.values()) {
-      image.set(pixel.x, pixel.y, pixel.oldColor);
-    }
-  }
-
-  redo(image) {
-    for (let pixel of this.pixels.values()) {
-      image.set(pixel.x, pixel.y, pixel.newColor);
+  getColor(x, y) {
+    let key = x + ',' + y;
+    if (this.pixels.has(key)) {
+      return this.pixels.get(key).color;
     }
   }
 }
@@ -137,6 +237,14 @@ class Image {
     this.size = [width, height];
     this.nchannels = nchannels;
     this.bytes = pixels;
+  }
+
+  clone() {
+    let newBytes = new Uint8Array(this.bytes.length);
+    for (let i = 0; i < newBytes.length; ++i) {
+      newBytes[i] = this.bytes[i];
+    }
+    return new Image(this.width, this.height, this.nchannels, newBytes);
   }
 
   aspectRatio() {
@@ -463,8 +571,8 @@ function mouseToPixels(mouseX, mouseY) {
 
 function drawPixel(p) {
   if (p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height) {
-    currentUndoable.add(p.x, p.y, image.get(p.x, p.y), color);
-    image.set(p.x, p.y, color);
+    history.current.add(p.x, p.y, selectedColor.slice(0));
+    image.set(p.x, p.y, selectedColor);
   }
 }
 
@@ -479,17 +587,16 @@ function drawLine(from, to) {
 
 function onMouseDown(e) {
   if (e.buttons == 1) {
-    // color = [0, 0, 0, 255];
+    // selectedColor = [0, 0, 0, 255];
   // } else {
-    // color = [0, 0, 0, Math.round(0.1 * 255)];
+    // selectedColor = [0, 0, 0, Math.round(0.1 * 255)];
   }
   mouseAt = mouseToPixels(e.clientX, e.clientY);
 
   if (activeToolDiv == tools.pencil) {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, imageTexture);
-    currentUndoable = new UndoablePixels(undoId);
-    ++undoId;
+    history.begin(new UndoablePixels());
     drawPixel(mouseAt);
     render();
   }
@@ -506,99 +613,12 @@ function isOverImage(p) {
 }
 
 function selectColor(rgba) {
-  color = rgba;
+  selectedColor = rgba;
   syncWidgetsToColor();
 }
 
-function undo(id, undoSuccessorsToo, isDelete = false) {
-  // Undo everything through the undo entry.
-  let i = undos.length;
-  do {
-    --i;
-    undos[i].unapply(image); 
-    if (undos[i].id != id && undoSuccessorsToo) {
-      undos[i].isDone = false;
-      undos[i].checkbox.checked = false;
-      if (isDelete) {
-        undosList.removeChild(undos[i].div);
-      }
-    }
-  } while (i > 0 && undos[i].id != id);
-
-  undos[i].isDone = false;
-  if (isDelete) {
-    undosList.removeChild(undos[i].div);
-    if (undoSuccessorsToo) {
-      undos.splice(i, undos.length - i);
-    } else {
-      undos.splice(i, 1);
-    }
-  }
-
-  while (i < undos.length) {
-    undos[i].reapply(image);
-    ++i;
-  }
-
-  render();
-}
-
-function redo(id, redoSuccessorsToo) {
-  // Undo everything up to but not including the undo entry.
-  let i = undos.length - 1;
-  while (i >= 0 && undos[i].id != id) {
-    undos[i].unapply(image); 
-    if (redoSuccessorsToo) {
-      undos[i].isDone = true;
-      undos[i].checkbox.checked = true;
-    }
-    --i;
-  }
-
-  undos[i].isDone = true;
-
-  while (i < undos.length) {
-    undos[i].reapply(image);
-    ++i;
-  }
-
-  render();
-}
-
-function addUndoable() {
-  let div = document.createElement('div');
-  let id = currentUndoable.id;
-
-  div.classList.add('undoEntry');
-  div.id = `undo${id}`;
-  div.innerHTML = `<input type="checkbox" class="column0" checked><span class="column1">${currentUndoable.getLabel()}</span><span class="column2">\u2715</span>`;
-  undosList.insertBefore(div, undosList.firstChild);
-
-  let checkbox = document.querySelector(`#${div.id} input[type="checkbox"]`);
-  checkbox.addEventListener('click', e => {
-    if (checkbox.checked) {
-      redo(id, e.shiftKey);
-    } else {
-      undo(id, e.shiftKey);
-    }
-  });
-
-  let deleteButton = document.querySelector(`#${div.id} > .column2`);
-  deleteButton.addEventListener('click', e => {
-    undo(id, e.shiftKey, true);
-  });
-
-  currentUndoable.checkbox = checkbox;
-  currentUndoable.div = div;
-
-  undos.push(currentUndoable);
-  currentUndoable = null;
-}
-
 function onMouseUp(e) {
-  if (currentUndoable) {
-    addUndoable();
-  }
+  history.commit();
   lockAxis = null;
 }
 
@@ -607,7 +627,7 @@ function onMouseMove(e) {
 
   let newMouseAt = mouseToPixels(e.clientX, e.clientY);
 
-  if (lockAxis == null && !newMouseAt.equals(mouseAt) && e.shiftKey) {
+  if (lockAxis == null && mouseAt && !newMouseAt.equals(mouseAt) && e.shiftKey) {
     let diff = newMouseAt.subtract(mouseAt).abs();
     if (diff.x > diff.y) {
       lockAxis = 1;
@@ -690,6 +710,7 @@ function registerCallbacks() {
   // Tools
   tools.pencil = document.getElementById('pencil');
   tools.eyedropper = document.getElementById('eyedropper');
+  tools.bucket = document.getElementById('bucket');
 
   activateTool(tools.pencil);
   for (var tool in tools) {
@@ -712,32 +733,32 @@ function activateTool(div) {
 }
 
 function syncColor() {
-  channelsRoot.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+  channelsRoot.style['background-color'] = `rgb(${selectedColor[0]}, ${selectedColor[1]}, ${selectedColor[2]})`;
 }
 
 function syncWidgetsToColor() {
   syncColor();
   for (let [i, widget] of rgbWidgets.entries()) {
-    widget.slider.value = color[i];
-    widget.box.value = color[i];
+    widget.slider.value = selectedColor[i];
+    widget.box.value = selectedColor[i];
   }
 }
 
 function initializeChannelWidgets(i, slider, box) {
   syncColor();
-  box.value = color[i];
-  slider.value = color[i];
+  box.value = selectedColor[i];
+  slider.value = selectedColor[i];
 
   slider.addEventListener('input', () => {
-    color[i] = slider.value;
-    box.value = color[i];
+    selectedColor[i] = parseInt(slider.value);
+    box.value = selectedColor[i];
     syncColor();
   });
 
   box.addEventListener('input', () => {
     if (integerPattern.test(box.value)) {
-      color[i] = parseInt(box.value);
-      slider.value = color[i];
+      selectedColor[i] = parseInt(box.value);
+      slider.value = selectedColor[i];
       syncColor();
     }
   });
@@ -829,6 +850,7 @@ function updateProjection() {
 function loadImage(path, width, height, nchannels, pixels) {
   imagePath = path;
   image = new Image(width, height, nchannels, pixels);
+  history = new UndoHistory(image.clone());
   updateProjection();
   gl.activeTexture(gl.TEXTURE1);
   imageTexture = createTexture(gl, width, height, nchannels, pixels);
