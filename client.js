@@ -16,6 +16,8 @@ let rgbWidgets;
 let channelsRoot;
 let color = [0, 255, 0, 255];
 
+let lockAxis = null;
+
 let integerPattern = /^\d+$/;
 let canvas;
 let gl;
@@ -184,6 +186,10 @@ class Vector2 {
 
   subtract(that) {
     return new Vector2(this.x - that.x, this.y - that.y);
+  }
+
+  equals(that) {
+    return this.x == that.x && this.y == that.y;
   }
 
   get x() {
@@ -593,12 +599,29 @@ function onMouseUp(e) {
   if (currentUndoable) {
     addUndoable();
   }
+  lockAxis = null;
 }
 
 function onMouseMove(e) {
   if (!image) return;
 
   let newMouseAt = mouseToPixels(e.clientX, e.clientY);
+
+  if (lockAxis == null && !newMouseAt.equals(mouseAt) && e.shiftKey) {
+    let diff = newMouseAt.subtract(mouseAt).abs();
+    if (diff.x > diff.y) {
+      lockAxis = 1;
+    } else {
+      lockAxis = 0;
+    }
+  }
+
+  if (lockAxis == 0) {
+    newMouseAt.x = mouseAt.x;
+  } else if (lockAxis == 1) {
+    newMouseAt.y = mouseAt.y;
+  }
+
   if (isOverImage(newMouseAt)) {
     canvas.classList.add('imageHovered');
   } else {
