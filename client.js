@@ -804,7 +804,8 @@ function registerCallbacks() {
 
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
-  canvas.addEventListener('mouseup', onMouseUp);
+  // canvas.addEventListener('mouseup', onMouseUp);
+  window.addEventListener('mouseup', onMouseUp);
 
   window.addEventListener('keydown', e => {
     if (e.key == 'p') {
