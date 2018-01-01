@@ -110,12 +110,24 @@ body {
   font-family: sans-serif;
   text-align: center;
   background-color: rgb(180, 180, 180);
+  border-radius: 5px;
+}
+
+.tool > img {
+  user-drag: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
 }
 
 .tool.active {
-  background-color: rgb(100, 100, 100);
+  background-color: #6495ED;
 }
 
 .panel {
   margin-bottom: 10px;
+}
+
+.panelBody {
+  user-select: none;
 }
