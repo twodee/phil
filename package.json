@@ -1,0 +1,11 @@
+{
+  "name": "Cuadros",
+  "version": "0.1.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^3.0.13"
+  }
+}
