@@ -1,5 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const sharp = require('sharp');
+// https://sharp.dimens.io
 
 function createWindow() {
   var browser = new BrowserWindow({ width: 800, height: 600 });

@@ -12,6 +12,60 @@ let imageTexture;
 let backgroundTextureUniform;
 let imageTextureUniform;
 let resolutionUniform;
+let projectionUniform;
+
+let projection;
+
+let imageAspect = 1;
+
+class Matrix4 {
+  constructor() {
+    this.buffer = new ArrayBuffer(16 * 4);
+    this.floats = new Float32Array(this.buffer);
+    // this.dataview = new DataView(this.buffer);
+    this.set(0, 0, 1);
+    this.set(1, 1, 1);
+    this.set(2, 2, 1);
+    this.set(3, 3, 1);
+  }
+
+  get(r, c) {
+    return this.floats[c * 4 + r];
+  }
+
+  set(r, c, value) {
+    this.floats[c * 4 + r] = value;
+    return this;
+  }
+
+  toString() {
+    let s = '';
+    for (let r = 0; r < 4; ++r) {
+      for (let c = 0; c < 4; ++c) {
+        let value = this.get(r, c);
+        value = Math.round(value * 1000) / 1000
+        s += value + ' ';
+      }
+      s += '\n';
+    }
+    return s;
+  }
+
+  toBuffer() {
+    return this.floats;
+  }
+
+  static ortho(left, right, bottom, top, near = -1, far = 1) {
+    var m = new Matrix4();
+    m.set(0, 0, 2 / (right - left));
+    m.set(1, 1, 2 / (top - bottom));
+    m.set(2, 2, 2 / (near - far));
+    m.set(0, 3, -(right + left) / (right - left));
+    m.set(1, 3, -(top + bottom) / (top - bottom));
+    m.set(2, 3, (near + far) / (near - far));
+    return m;
+  }
+}
 
 function createBackground() {
   let vertexSource = `#version 300 es
@@ -80,13 +134,14 @@ void main() {
 
 function createImage() {
   let vertexSource = `#version 300 es
-uniform vec2 resolution;
+uniform mat4 projection;
 in vec4 position;
+in vec2 texCoords;
 out vec2 fTexCoords;
 
 void main() {
-  gl_Position = position;
-  fTexCoords = position.xy * 0.5 + 0.5;
+  gl_Position = projection * position;
+  fTexCoords = texCoords;
 }
   `;
 
@@ -107,24 +162,37 @@ void main() {
   imageProgram = linkProgram(vertexShader, fragmentShader);
 
   let scale = 0.9;
-  let positions = [
+  let vertices = [
     -scale, -scale, 0.0, 1.0,
-     scale, -scale, 0.0, 1.0,
-    -scale,  scale, 0.0, 1.0,
-     scale,  scale, 0.0, 1.0
-  ];
+    0.0, 1.0,
 
-  let positionAttributeLocation = gl.getAttribLocation(imageProgram, 'position');
-  let positionBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    scale, -scale, 0.0, 1.0,
+    1.0, 1.0,
+
+    -scale,  scale, 0.0, 1.0,
+    0.0, 0.0,
+
+    scale,  scale, 0.0, 1.0,
+    1.0, 0.0,
+  ];
 
   imageVao = gl.createVertexArray();
   gl.bindVertexArray(imageVao);
+
+  let vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+  let positionAttributeLocation = gl.getAttribLocation(imageProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 24, 0);
   gl.enableVertexAttribArray(positionAttributeLocation);
-  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+
+  let texCoordsAttributeLocation = gl.getAttribLocation(imageProgram, 'texCoords');
+  gl.vertexAttribPointer(texCoordsAttributeLocation, 2, gl.FLOAT, false, 24, 16);
+  gl.enableVertexAttribArray(texCoordsAttributeLocation);
 
   imageTextureUniform = gl.getUniformLocation(imageProgram, 'imageTexture');
+  projectionUniform = gl.getUniformLocation(imageProgram, 'projection');
 
   gl.useProgram(imageProgram);
   gl.uniform1i(imageTextureUniform, 1);
@@ -164,6 +232,7 @@ function render() {
 
   if (imageTexture) {
     gl.useProgram(imageProgram);
+    gl.uniformMatrix4fv(projectionUniform, false, projection.toBuffer());
     gl.bindVertexArray(imageVao);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
@@ -200,17 +269,27 @@ function compileShader(type, source) {
 }
 
 function onSize() {
-  console.log("sizing");
   canvas.width = canvas.clientWidth; 
   canvas.height = canvas.clientHeight; 
+  updateProjection();
   render();
+}
+
+function updateProjection() {
+  let windowAspect = canvas.width / canvas.height;
+  if (windowAspect < imageAspect) {
+    projection = Matrix4.ortho(-1, 1, -1 / windowAspect * imageAspect, 1 / windowAspect * imageAspect);
+  } else {
+    projection = Matrix4.ortho(-1 * windowAspect / imageAspect, 1 * windowAspect / imageAspect, -1, 1);
+  }
 }
 
 function loadTexture(width, height, nchannels, pixels) {
   console.log("width:", width);
   console.log("height:", height);
   console.log("nchannels:", nchannels);
-
+  imageAspect = width / height;
+  updateProjection();
   gl.activeTexture(gl.TEXTURE1);
   imageTexture = createTexture(gl, width, height, nchannels, pixels);
   render();
