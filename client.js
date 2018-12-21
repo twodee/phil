@@ -75,7 +75,7 @@ out vec2 fTexCoords;
 
 void main() {
   gl_Position = position;
-  fTexCoords = (position.xy * 0.5 + 0.5) * (resolution * 0.05);
+  fTexCoords = (vec2(position.x, -position.y) * 0.5 + 0.5) * (resolution * 0.05);
 }
   `;
 
@@ -112,8 +112,8 @@ void main() {
   gl.enableVertexAttribArray(positionAttributeLocation);
   gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
 
-  let dark = 60;
-  let lite = 90;
+  let dark = 120;
+  let lite = 150;
   let checker = new Uint8Array([
     dark, dark, dark, 255,
     lite, lite, lite, 255,
@@ -153,7 +153,12 @@ out vec4 fragmentColor;
 
 void main() {
   // fragmentColor = vec4(fTexCoords, 0.0, 1.0);
-  fragmentColor = texture(imageTexture, fTexCoords);
+  vec4 rgba = texture(imageTexture, fTexCoords);
+  if (rgba.a < 0.001) {
+    discard;
+  } else {
+    fragmentColor = vec4(rgba.rgb, 1.0);
+  }
 }
   `; 
 
@@ -201,7 +206,10 @@ void main() {
 
 function onReady() {
   canvas = document.getElementById('canvas');
-  gl = canvas.getContext('webgl2');
+  gl = canvas.getContext('webgl2', {
+    // premultipliedAlpha: false
+  });
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   createBackground();
   createImage();
   render();
@@ -210,6 +218,12 @@ function onReady() {
 }
 
 function createTexture(gl, width, height, nchannels, pixels) {
+
+  console.log("pixels[0]:", pixels[0]);
+  console.log("pixels[1]:", pixels[1]);
+  console.log("pixels[2]:", pixels[2]);
+  console.log("pixels[3]:", pixels[3]);
+
   let texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, nchannels == 4 ? gl.RGBA : gl.RGB, gl.UNSIGNED_BYTE, pixels);
@@ -221,7 +235,7 @@ function createTexture(gl, width, height, nchannels, pixels) {
 function render() {
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   gl.useProgram(backgroundProgram);
   gl.uniform2f(resolutionUniform, gl.canvas.width, gl.canvas.height);
@@ -231,6 +245,10 @@ function render() {
   gl.useProgram(null);
 
   if (imageTexture) {
+    // Chrome is doing weird things with blending. A semi-transparent gray
+    // appears green. So, we output opaque pixels but discard 0-alpha pixels.
+    // gl.enable(gl.BLEND);
+    // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(imageProgram);
     gl.uniformMatrix4fv(projectionUniform, false, projection.toBuffer());
     gl.bindVertexArray(imageVao);
