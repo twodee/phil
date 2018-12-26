@@ -1,3 +1,6 @@
+const sharp = require('sharp');
+const fsdialog = require('electron').remote.dialog;
+
 let canvas;
 let gl;
 
@@ -17,6 +20,7 @@ let projectionUniform;
 let projection;
 let inverseProjection;
 
+let imagePath;
 let image;
 let mouseAt;
 
@@ -24,8 +28,7 @@ class Image {
   constructor(width, height, nchannels, pixels) {
     this.size = [width, height];
     this.nchannels = nchannels;
-    this.pixels = pixels;
-    this.bytes = new Uint8Array(this.pixels);
+    this.bytes = pixels;
   }
 
   aspectRatio() {
@@ -33,8 +36,6 @@ class Image {
   }
 
   set(c, r, rgb) {
-    console.log("c:", c);
-    console.log("r:", r);
     var start = (r * this.width + c) * 4;
     this.bytes[start + 0] = rgb[0];
     this.bytes[start + 1] = rgb[1];
@@ -66,10 +67,6 @@ class Vector2 {
   }
 
   subtract(that) {
-    console.log("this.x:", this.x);
-    console.log("that.x:", that.x);
-    console.log("this.y:", this.y);
-    console.log("that.y:", that.y);
     return new Vector2(this.x - that.x, this.y - that.y);
   }
 
@@ -475,7 +472,8 @@ function updateProjection() {
   }
 }
 
-function loadTexture(width, height, nchannels, pixels) {
+function loadImage(path, width, height, nchannels, pixels) {
+  imagePath = path;
   image = new Image(width, height, nchannels, pixels);
   updateProjection();
   gl.activeTexture(gl.TEXTURE1);
@@ -483,8 +481,33 @@ function loadTexture(width, height, nchannels, pixels) {
   render();
 }
 
-require('electron').ipcRenderer.on('loadTexture', (event, width, height, nchannels, pixels) => {
-  loadTexture(width, height, nchannels, pixels);
+function saveImage(path) {
+  sharp(image.bytes, {
+    raw: {
+      width: image.width,
+      height: image.height,
+      channels: image.nchannels,
+    }
+  }).toFile(imagePath, error => {
+    console.log("error:", error);
+  });
+}
+
+require('electron').ipcRenderer.on('loadImage', (event, path, width, height, nchannels, pixels) => {
+  loadImage(path, width, height, nchannels, pixels);
+});
+
+require('electron').ipcRenderer.on('saveAs', function(event, data) {
+  fsdialog.showSaveDialog({
+    title: 'Save as...',
+  }, function(path) {
+    imagePath = path;
+    saveImage(imagePath);
+  });
+});
+
+require('electron').ipcRenderer.on('save', function(event, data) {
+  saveImage(imagePath);
 });
 
 window.addEventListener('load', onReady);
