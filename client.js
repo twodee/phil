@@ -15,14 +15,110 @@ let resolutionUniform;
 let projectionUniform;
 
 let projection;
+let inverseProjection;
 
-let imageAspect = 1;
+let image;
+let mouseAt;
+
+class Image {
+  constructor(width, height, nchannels, pixels) {
+    this.size = [width, height];
+    this.nchannels = nchannels;
+    this.pixels = pixels;
+    this.bytes = new Uint8Array(this.pixels);
+  }
+
+  aspectRatio() {
+    return this.width / this.height;
+  }
+
+  set(c, r, rgb) {
+    console.log("c:", c);
+    console.log("r:", r);
+    var start = (r * this.width + c) * 4;
+    this.bytes[start + 0] = rgb[0];
+    this.bytes[start + 1] = rgb[1];
+    this.bytes[start + 2] = rgb[2];
+    this.bytes[start + 3] = rgb[3];
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, c, r, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.bytes, (r * this.width + c) * 4);
+  }
+
+  get width() {
+    return this.size[0];
+  }
+
+  get height() {
+    return this.size[1];
+  }
+
+  set width(value) {
+    this.size[0] = value;
+  }
+
+  set height(value) {
+    this.size[1] = value;
+  }
+}
+
+class Vector2 {
+  constructor(x, y) {
+    this.values = [x, y];
+  }
+
+  subtract(that) {
+    console.log("this.x:", this.x);
+    console.log("that.x:", that.x);
+    console.log("this.y:", this.y);
+    console.log("that.y:", that.y);
+    return new Vector2(this.x - that.x, this.y - that.y);
+  }
+
+  get x() {
+    return this.values[0];
+  }
+
+  get y() {
+    return this.values[1];
+  }
+
+  set x(value) {
+    this.values[0] = value;
+  }
+
+  set y(value) {
+    this.values[1] = value;
+  }
+
+  abs() {
+    return new Vector2(Math.abs(this.x), Math.abs(this.y));
+  }
+
+  round() {
+    return new Vector2(Math.round(this.x), Math.round(this.y));
+  }
+
+  maxValue() {
+    return Math.max(this.x, this.y);
+  }
+
+  toString() {
+    return `${this.x} ${this.y}`;
+  }
+
+  static lerp(from, to, t) {
+    let diff = to.subtract(from);
+    return new Vector2(from.x + t * diff.x, from.y + t * diff.y);
+  }
+
+  static diagonalDistance(from, to) {
+    return to.subtract(from).abs().maxValue();
+  }
+}
 
 class Matrix4 {
   constructor() {
     this.buffer = new ArrayBuffer(16 * 4);
     this.floats = new Float32Array(this.buffer);
-    // this.dataview = new DataView(this.buffer);
     this.set(0, 0, 1);
     this.set(1, 1, 1);
     this.set(2, 2, 1);
@@ -55,6 +151,16 @@ class Matrix4 {
     return this.floats;
   }
 
+  multiply(v) {
+    var product = [0, 0, 0, 0];
+    for (var r = 0; r < 4; ++r) {
+      for (var c = 0; c < 4; ++c) {
+        product[r] += this.get(r, c) * v[c];
+      }
+    }
+    return product;
+  }
+
   static ortho(left, right, bottom, top, near = -1, far = 1) {
     var m = new Matrix4();
     m.set(0, 0, 2 / (right - left));
@@ -63,6 +169,22 @@ class Matrix4 {
     m.set(0, 3, -(right + left) / (right - left));
     m.set(1, 3, -(top + bottom) / (top - bottom));
     m.set(2, 3, (near + far) / (near - far));
+    return m;
+  }
+
+  static inverseOrtho(left, right, bottom, top, near = -1, far = 1) {
+    var m = Matrix4.scale((right - left) * 0.5, (top - bottom) * 0.5, (near - far) * 0.5);
+    m.set(0, 3, (right + left) * 0.5);
+    m.set(1, 3, (top + bottom) * 0.5);
+    m.set(2, 3, (far + near) * 0.5);
+    return m;
+  }
+
+  static scale(x, y, z) {
+    var m = new Matrix4();
+    m.set(0, 0, x);
+    m.set(1, 1, y);
+    m.set(2, 2, z);
     return m;
   }
 }
@@ -154,11 +276,7 @@ out vec4 fragmentColor;
 void main() {
   // fragmentColor = vec4(fTexCoords, 0.0, 1.0);
   vec4 rgba = texture(imageTexture, fTexCoords);
-  if (rgba.a < 0.001) {
-    discard;
-  } else {
-    fragmentColor = vec4(rgba.rgb, 1.0);
-  }
+  fragmentColor = rgba;
 }
   `; 
 
@@ -166,7 +284,7 @@ void main() {
   let fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
   imageProgram = linkProgram(vertexShader, fragmentShader);
 
-  let scale = 0.9;
+  let scale = 1.0;
   let vertices = [
     -scale, -scale, 0.0, 1.0,
     0.0, 1.0,
@@ -204,11 +322,68 @@ void main() {
   gl.useProgram(null);
 }
 
+function mouseToPixels(mouseX, mouseY) {
+  var positionMouse = [mouseX, mouseY];
+
+  var positionClip = [
+    positionMouse[0] / gl.canvas.width * 2 - 1,
+    positionMouse[1] / gl.canvas.height * 2 - 1,
+    0,
+    1
+  ];
+
+  var positionTexture = inverseProjection.multiply(positionClip);
+
+  var positionPixels = new Vector2(
+    Math.floor((positionTexture[0] * 0.5 + 0.5) * image.width),
+    Math.floor((positionTexture[1] * 0.5 + 0.5) * image.height)
+  );
+
+  return positionPixels;
+}
+
+function drawPixel(p) {
+  var color = [0, 0, 0, 255];
+  if (p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height) {
+    image.set(p.x, p.y, color);
+  }
+}
+
+function drawLine(from, to) {
+  let n = Vector2.diagonalDistance(from, to);
+  for (let step = 0; step <= n; step += 1) {
+    let t = n == 0 ? 0.0 : step / n;
+    let p = Vector2.lerp(from, to, t).round(); 
+    drawPixel(p);
+  }
+}
+
+function onMouseDown(e) {
+  mouseAt = mouseToPixels(e.clientX, e.clientY);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+  drawPixel(mouseAt);
+  render();
+}
+
+function onMouseMove(e) {
+  if (e.buttons == 1) {
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+    let newMouseAt = mouseToPixels(e.clientX, e.clientY);
+    drawLine(mouseAt, newMouseAt);
+    render();
+    mouseAt = newMouseAt;
+  }
+}
+
 function onReady() {
   canvas = document.getElementById('canvas');
-  gl = canvas.getContext('webgl2', {
-    // premultipliedAlpha: false
-  });
+
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+
+  gl = canvas.getContext('webgl2');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   createBackground();
   createImage();
@@ -218,12 +393,6 @@ function onReady() {
 }
 
 function createTexture(gl, width, height, nchannels, pixels) {
-
-  console.log("pixels[0]:", pixels[0]);
-  console.log("pixels[1]:", pixels[1]);
-  console.log("pixels[2]:", pixels[2]);
-  console.log("pixels[3]:", pixels[3]);
-
   let texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, nchannels == 4 ? gl.RGBA : gl.RGB, gl.UNSIGNED_BYTE, pixels);
@@ -245,10 +414,8 @@ function render() {
   gl.useProgram(null);
 
   if (imageTexture) {
-    // Chrome is doing weird things with blending. A semi-transparent gray
-    // appears green. So, we output opaque pixels but discard 0-alpha pixels.
-    // gl.enable(gl.BLEND);
-    // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(imageProgram);
     gl.uniformMatrix4fv(projectionUniform, false, projection.toBuffer());
     gl.bindVertexArray(imageVao);
@@ -294,19 +461,22 @@ function onSize() {
 }
 
 function updateProjection() {
+  if (!image) return;
+
   let windowAspect = canvas.width / canvas.height;
+  let imageAspect = image.aspectRatio();
+
   if (windowAspect < imageAspect) {
     projection = Matrix4.ortho(-1, 1, -1 / windowAspect * imageAspect, 1 / windowAspect * imageAspect);
+    inverseProjection = Matrix4.inverseOrtho(-1, 1, -1 / windowAspect * imageAspect, 1 / windowAspect * imageAspect);
   } else {
     projection = Matrix4.ortho(-1 * windowAspect / imageAspect, 1 * windowAspect / imageAspect, -1, 1);
+    inverseProjection = Matrix4.inverseOrtho(-1 * windowAspect / imageAspect, 1 * windowAspect / imageAspect, -1, 1);
   }
 }
 
 function loadTexture(width, height, nchannels, pixels) {
-  console.log("width:", width);
-  console.log("height:", height);
-  console.log("nchannels:", nchannels);
-  imageAspect = width / height;
+  image = new Image(width, height, nchannels, pixels);
   updateProjection();
   gl.activeTexture(gl.TEXTURE1);
   imageTexture = createTexture(gl, width, height, nchannels, pixels);

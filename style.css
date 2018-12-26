@@ -14,8 +14,10 @@ body {
 }
 
 #canvas {
-  background-color: green;
+  background-color: black;
   flex: 1;
   min-width: 0;
   min-height: 0;
+  cursor: crosshair;
+  user-select: none;
 }
