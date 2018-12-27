@@ -339,8 +339,8 @@ function mouseToPixels(mouseX, mouseY) {
   return positionPixels;
 }
 
+var color = [0, 0, 0, 255];
 function drawPixel(p) {
-  var color = [0, 0, 0, 255];
   if (p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height) {
     image.set(p.x, p.y, color);
   }
@@ -356,6 +356,11 @@ function drawLine(from, to) {
 }
 
 function onMouseDown(e) {
+  if (e.buttons == 1) {
+    color = [0, 0, 0, 255];
+  } else {
+    color = [0, 0, 0, Math.round(0.1 * 255)];
+  }
   mouseAt = mouseToPixels(e.clientX, e.clientY);
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, imageTexture);
@@ -363,11 +368,21 @@ function onMouseDown(e) {
   render();
 }
 
+function isOverImage(p) {
+  return p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height;
+}
+
 function onMouseMove(e) {
+  let newMouseAt = mouseToPixels(e.clientX, e.clientY);
+  if (isOverImage(newMouseAt)) {
+    canvas.classList.remove('image-hovered');
+  } else {
+    canvas.classList.add('image-hovered');
+  }
+
   if (e.buttons == 1) {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, imageTexture);
-    let newMouseAt = mouseToPixels(e.clientX, e.clientY);
     drawLine(mouseAt, newMouseAt);
     render();
     mouseAt = newMouseAt;
