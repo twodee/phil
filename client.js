@@ -1,6 +1,10 @@
 const sharp = require('sharp');
 const fsdialog = require('electron').remote.dialog;
 
+let channelsRoot;
+let color = [0, 255, 0, 255];
+
+let integerPattern = /^\d+$/;
 let canvas;
 let gl;
 
@@ -339,7 +343,6 @@ function mouseToPixels(mouseX, mouseY) {
   return positionPixels;
 }
 
-var color = [0, 0, 0, 255];
 function drawPixel(p) {
   if (p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height) {
     image.set(p.x, p.y, color);
@@ -357,9 +360,9 @@ function drawLine(from, to) {
 
 function onMouseDown(e) {
   if (e.buttons == 1) {
-    color = [0, 0, 0, 255];
-  } else {
-    color = [0, 0, 0, Math.round(0.1 * 255)];
+    // color = [0, 0, 0, 255];
+  // } else {
+    // color = [0, 0, 0, Math.round(0.1 * 255)];
   }
   mouseAt = mouseToPixels(e.clientX, e.clientY);
   gl.activeTexture(gl.TEXTURE1);
@@ -401,7 +404,54 @@ function onReady() {
   createImage();
   render();
 
+  channelsRoot = document.getElementById('channelsRoot');
+  registerCallbacks();
   onSize();
+}
+
+function registerCallbacks() {
+  // RGB sliders
+  let sliders = [
+    document.getElementById('redSlider'),
+    document.getElementById('greenSlider'),
+    document.getElementById('blueSlider'),
+    document.getElementById('alphaSlider'),
+  ];
+
+  let boxes = [
+    document.getElementById('redBox'),
+    document.getElementById('greenBox'),
+    document.getElementById('blueBox'),
+    document.getElementById('alphaBox'),
+  ];
+
+  for (let [i, slider] of sliders.entries()) {
+    initializeChannelWidgets(i, slider, boxes[i]);
+  }
+}
+
+function syncColor() {
+  channelsRoot.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+}
+
+function initializeChannelWidgets(i, slider, box) {
+  syncColor();
+  box.value = color[i];
+  slider.value = color[i];
+
+  slider.addEventListener('input', () => {
+    color[i] = slider.value;
+    box.value = color[i];
+    syncColor();
+  });
+
+  box.addEventListener('input', () => {
+    if (integerPattern.test(box.value)) {
+      color[i] = parseInt(box.value);
+      slider.value = color[i];
+      syncColor();
+    }
+  });
 }
 
 function createTexture(gl, width, height, nchannels, pixels) {

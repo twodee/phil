@@ -1,3 +1,7 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
   width: 100vw;
   height: 100vh;
@@ -13,15 +17,53 @@ body {
   display: flex;
 }
 
-#canvas {
-  background-color: black;
+#left {
+  background-color: cyan;
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+
+#canvas {
+  background-color: black;
   cursor: url(images/pencil.png) 6 21, crosshair;
   user-select: none;
+  width: 100%;
+  height: 100%;
 }
 
 #canvas.image-hovered {
   cursor: auto;
+}
+
+.panelHeader {
+  font-family: sans-serif;
+  margin-bottom: 1em;
+}
+
+#right {
+  background-color: #C9C9C9;
+  flex: 0;
+  min-width: 300px;
+  height: 100%;
+  padding: 10px;
+}
+
+#channelsRoot {
+  width: 100%;
+  display: grid;
+  grid-template-columns: min-content auto min-content;
+  grid-column-gap: 5px;
+  grid-row-gap: 5px;
+}
+
+.channelLabel {
+  font-family: sans-serif;
+  font-size: 10pt;
+}
+
+.channelSlider {
+}
+
+.channelBox {
 }

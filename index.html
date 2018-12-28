@@ -9,7 +9,31 @@
 <body>
 
   <div id="root">
-    <canvas id="canvas"></canvas>
+    <div id="left"><canvas id="canvas"></canvas></div>
+    <div id="right">
+      <div class="panel">
+        <div class="panelHeader">Color</div>
+        <div class="panelBody">
+          <div id="channelsRoot">
+            <span class="channelLabel">Red</span>
+            <input type="range" class="channelSlider" id="redSlider" min="0" max="255">
+            <input type="textbox" class="channelBox" id="redBox" size="3">
+
+            <span class="channelLabel">Green</span>
+            <input type="range" class="channelSlider" id="greenSlider" min="0" max="255">
+            <input type="textbox" class="channelBox" id="greenBox" size="3">
+
+            <span class="channelLabel">Blue</span>
+            <input type="range" class="channelSlider" id="blueSlider" min="0" max="255">
+            <input type="textbox" class="channelBox" id="blueBox" size="3">
+
+            <span class="channelLabel">Alpha</span>
+            <input type="range" class="channelSlider" id="alphaSlider" min="0" max="255">
+            <input type="textbox" class="channelBox" id="alphaBox" size="3">
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
   
 </body>
