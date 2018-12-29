@@ -562,13 +562,40 @@ require('electron').ipcRenderer.on('loadImage', (event, path, width, height, nch
   loadImage(path, width, height, nchannels, pixels);
 });
 
-require('electron').ipcRenderer.on('saveAs', function(event, data) {
+let saveAsPath;
+
+function saveAs() {
+  let defaultPath;
+  if (saveAsPath) {
+    defaultPath = saveAsPath;
+  } else if (imagePath) {
+    defaultPath = imagePath;
+  } else {
+    defaultPath = 'untitled.png';
+  }
+
   fsdialog.showSaveDialog({
     title: 'Save as...',
+    defaultPath: defaultPath,
   }, function(path) {
-    imagePath = path;
-    saveImage(imagePath);
+    if (path) {
+      saveAsPath = path;
+      if (/\.(png|jpg)$/.test(path)) {
+        imagePath = saveAsPath;
+        saveImage(imagePath);
+      } else {
+        fsdialog.showMessageBox({
+          message: `The file must have a .png or .jpg extension. ${path} does not.`,
+        }, () => {
+          saveAs();
+        });
+      }
+    }
   });
+}
+
+require('electron').ipcRenderer.on('saveAs', function(event, data) {
+  saveAs();
 });
 
 require('electron').ipcRenderer.on('save', function(event, data) {
