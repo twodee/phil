@@ -26,14 +26,14 @@ body {
 
 #canvas {
   background-color: black;
-  cursor: url(images/pencil.png) 6 21, crosshair;
   user-select: none;
   width: 100%;
   height: 100%;
+  cursor: auto;
 }
 
-#canvas.image-hovered {
-  cursor: auto;
+#canvas.imageHovered {
+  cursor: url(images/pencil.png) 6 21, crosshair;
 }
 
 .panelHeader {
@@ -66,4 +66,22 @@ body {
 }
 
 .channelBox {
+}
+
+.tool {
+  display: inline-block;
+  font-size: 24px;
+  width: 30px;
+  height: 30px;
+  font-family: sans-serif;
+  text-align: center;
+  background-color: rgb(180, 180, 180);
+}
+
+.tool.active {
+  background-color: rgb(100, 100, 100);
+}
+
+.panel {
+  margin-bottom: 10px;
 }

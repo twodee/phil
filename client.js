@@ -1,6 +1,9 @@
 const sharp = require('sharp');
 const fsdialog = require('electron').remote.dialog;
 
+let rgbWidgets;
+let activeToolDiv;
+let tools = {};
 let channelsRoot;
 let color = [0, 255, 0, 255];
 
@@ -46,6 +49,16 @@ class Image {
     this.bytes[start + 2] = rgb[2];
     this.bytes[start + 3] = rgb[3];
     gl.texSubImage2D(gl.TEXTURE_2D, 0, c, r, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.bytes, (r * this.width + c) * 4);
+  }
+
+  get(c, r) {
+    var start = (r * this.width + c) * 4;
+    return [
+      this.bytes[start + 0],
+      this.bytes[start + 1],
+      this.bytes[start + 2],
+      this.bytes[start + 3],
+    ];
   }
 
   get width() {
@@ -365,30 +378,53 @@ function onMouseDown(e) {
     // color = [0, 0, 0, Math.round(0.1 * 255)];
   }
   mouseAt = mouseToPixels(e.clientX, e.clientY);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, imageTexture);
-  drawPixel(mouseAt);
-  render();
+
+  if (activeToolDiv == tools.pencil) {
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+    drawPixel(mouseAt);
+    render();
+  }
+  
+  else if (activeToolDiv == tools.eyedropper) {
+    if (isOverImage(mouseAt)) {
+      selectColor(image.get(mouseAt.x, mouseAt.y));
+    }
+  }
 }
 
 function isOverImage(p) {
   return p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height;
 }
 
+function selectColor(rgba) {
+  color = rgba;
+  syncWidgetsToColor();
+}
+
 function onMouseMove(e) {
   let newMouseAt = mouseToPixels(e.clientX, e.clientY);
   if (isOverImage(newMouseAt)) {
-    canvas.classList.remove('image-hovered');
+    canvas.classList.add('imageHovered');
   } else {
-    canvas.classList.add('image-hovered');
+    canvas.classList.remove('imageHovered');
   }
 
-  if (e.buttons == 1) {
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
-    drawLine(mouseAt, newMouseAt);
-    render();
+  if (activeToolDiv == tools.pencil) {
+    if (e.buttons == 1) {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+      drawLine(mouseAt, newMouseAt);
+      render();
+      mouseAt = newMouseAt;
+    }
+  }
+
+  else if (activeToolDiv == tools.eyedropper) {
     mouseAt = newMouseAt;
+    if (e.buttons == 1 && isOverImage(mouseAt)) {
+      selectColor(image.get(mouseAt.x, mouseAt.y));
+    }
   }
 }
 
@@ -411,27 +447,59 @@ function onReady() {
 
 function registerCallbacks() {
   // RGB sliders
-  let sliders = [
-    document.getElementById('redSlider'),
-    document.getElementById('greenSlider'),
-    document.getElementById('blueSlider'),
-    document.getElementById('alphaSlider'),
+  rgbWidgets = [
+    {
+      slider: document.getElementById('redSlider'),
+      box: document.getElementById('redBox'),
+    },
+    {
+      slider: document.getElementById('greenSlider'),
+      box: document.getElementById('greenBox'),
+    },
+    {
+      slider: document.getElementById('blueSlider'),
+      box: document.getElementById('blueBox'),
+    },
+    {
+      slider: document.getElementById('alphaSlider'),
+      box: document.getElementById('alphaBox'),
+    },
   ];
 
-  let boxes = [
-    document.getElementById('redBox'),
-    document.getElementById('greenBox'),
-    document.getElementById('blueBox'),
-    document.getElementById('alphaBox'),
-  ];
-
-  for (let [i, slider] of sliders.entries()) {
-    initializeChannelWidgets(i, slider, boxes[i]);
+  for (let [i, widget] of rgbWidgets.entries()) {
+    initializeChannelWidgets(i, widget.slider, widget.box);
   }
+
+  // Tools
+  tools.pencil = document.getElementById('pencil');
+  tools.eyedropper = document.getElementById('eyedropper');
+
+  activateTool(tools.pencil);
+  for (var tool in tools) {
+    tools[tool].addEventListener('click', e => {
+      activateTool(e.srcElement);
+    });
+  }
+}
+
+function activateTool(div) {
+  if (activeToolDiv) {
+    activeToolDiv.classList.remove('active');
+  }
+  activeToolDiv = div;
+  activeToolDiv.classList.add('active');
 }
 
 function syncColor() {
   channelsRoot.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+}
+
+function syncWidgetsToColor() {
+  syncColor();
+  for (let [i, widget] of rgbWidgets.entries()) {
+    widget.slider.value = color[i];
+    widget.box.value = color[i];
+  }
 }
 
 function initializeChannelWidgets(i, slider, box) {
