@@ -2,6 +2,38 @@
   box-sizing: border-box;
 }
 
+span {
+  font-family: sans-serif;
+}
+
+#undosList {
+  max-height: 200px;
+  overflow: auto;
+  background-color: rgb(220, 220, 220);
+  user-select: none;
+}
+
+.undoEntry {
+  display: flex;
+}
+
+.undoEntry > .column0 {
+  flex: 0;
+}
+
+.undoEntry > .column1 {
+  flex: 1;
+  margin-left: 0.2em;
+}
+
+.undoEntry > .column2 {
+  flex: 0;
+  color: red;
+  margin-right: 0.2em;
+  cursor: pointer;
+  user-select: none;
+}
+
 body {
   width: 100vw;
   height: 100vh;
@@ -39,6 +71,7 @@ body {
 .panelHeader {
   font-family: sans-serif;
   margin-bottom: 1em;
+  user-select: none;
 }
 
 #right {
@@ -47,6 +80,7 @@ body {
   min-width: 300px;
   height: 100%;
   padding: 10px;
+  overflow: auto;
 }
 
 #channelsRoot {

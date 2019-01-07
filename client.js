@@ -1,9 +1,18 @@
 const sharp = require('sharp');
 const fsdialog = require('electron').remote.dialog;
 
-let rgbWidgets;
+// Tools
 let activeToolDiv;
 let tools = {};
+
+// Undos
+let undosList;
+let currentUndoable = null;
+let undos = [];
+let undoId = 0;
+
+// Color
+let rgbWidgets;
 let channelsRoot;
 let color = [0, 255, 0, 255];
 
@@ -30,6 +39,96 @@ let inverseProjection;
 let imagePath;
 let image;
 let mouseAt;
+
+class Undoable {
+  constructor(id) {
+    this.id = id;
+    this.timestamp = new Date();
+    this.isDone = true;
+    this.checkbox = null;
+    this.div = null;
+  }
+
+  getLabel() {
+    let label = '';
+    
+    label += this.timestamp.getFullYear();
+    label += '/';
+    label += this.timestamp.getMonth() + 1;
+    label += '/';
+    label += this.timestamp.getDate();
+
+    label += ' ';
+
+    if (this.timestamp.getHours() < 10) {
+      label += '0';
+    }
+    label += this.timestamp.getHours();
+    label += ':';
+    if (this.timestamp.getMinutes() < 10) {
+      label += '0';
+    }
+    label += this.timestamp.getMinutes();
+    label += ':';
+    if (this.timestamp.getSeconds() < 10) {
+      label += '0';
+    }
+    label += this.timestamp.getSeconds();
+    
+    return label;
+  }
+
+  undo(image) {
+  }
+
+  redo(image) {
+  }
+
+  unapply(image) {
+    if (this.isDone) {
+      this.undo(image);
+    }
+  }
+
+  reapply(image) {
+    if (this.isDone) {
+      this.redo(image);
+    }
+  }
+}
+
+class UndoablePixels extends Undoable {
+  constructor(id) {
+    super(id);
+    this.pixels = new Map();
+  }
+
+  getLabel() {
+    let label = this.pixels.length == 1 ? 'pixel' : 'pixels';
+    return super.getLabel() + ' (' + this.pixels.size + ' ' + label + ')';
+  }
+
+  add(x, y, oldColor, newColor) {
+    let key = x + ',' + y;
+    if (this.pixels.has(key)) {
+      this.pixels.get(key).newColor = newColor;
+    } else {
+      this.pixels.set(key, {x: x, y: y, oldColor: oldColor, newColor: newColor});
+    }
+  }
+
+  undo(image) {
+    for (let pixel of this.pixels.values()) {
+      image.set(pixel.x, pixel.y, pixel.oldColor);
+    }
+  }
+
+  redo(image) {
+    for (let pixel of this.pixels.values()) {
+      image.set(pixel.x, pixel.y, pixel.newColor);
+    }
+  }
+}
 
 class Image {
   constructor(width, height, nchannels, pixels) {
@@ -358,6 +457,7 @@ function mouseToPixels(mouseX, mouseY) {
 
 function drawPixel(p) {
   if (p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height) {
+    currentUndoable.add(p.x, p.y, image.get(p.x, p.y), color);
     image.set(p.x, p.y, color);
   }
 }
@@ -382,6 +482,8 @@ function onMouseDown(e) {
   if (activeToolDiv == tools.pencil) {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+    currentUndoable = new UndoablePixels(undoId);
+    ++undoId;
     drawPixel(mouseAt);
     render();
   }
@@ -402,7 +504,100 @@ function selectColor(rgba) {
   syncWidgetsToColor();
 }
 
+function undo(id, undoSuccessorsToo, isDelete = false) {
+  // Undo everything through the undo entry.
+  let i = undos.length;
+  do {
+    --i;
+    undos[i].unapply(image); 
+    if (undos[i].id != id && undoSuccessorsToo) {
+      undos[i].isDone = false;
+      undos[i].checkbox.checked = false;
+      if (isDelete) {
+        undosList.removeChild(undos[i].div);
+      }
+    }
+  } while (i > 0 && undos[i].id != id);
+
+  undos[i].isDone = false;
+  if (isDelete) {
+    undosList.removeChild(undos[i].div);
+    if (undoSuccessorsToo) {
+      undos.splice(i, undos.length - i);
+    } else {
+      undos.splice(i, 1);
+    }
+  }
+
+  while (i < undos.length) {
+    undos[i].reapply(image);
+    ++i;
+  }
+
+  render();
+}
+
+function redo(id, redoSuccessorsToo) {
+  // Undo everything up to but not including the undo entry.
+  let i = undos.length - 1;
+  while (i >= 0 && undos[i].id != id) {
+    undos[i].unapply(image); 
+    if (redoSuccessorsToo) {
+      undos[i].isDone = true;
+      undos[i].checkbox.checked = true;
+    }
+    --i;
+  }
+
+  undos[i].isDone = true;
+
+  while (i < undos.length) {
+    undos[i].reapply(image);
+    ++i;
+  }
+
+  render();
+}
+
+function addUndoable() {
+  let div = document.createElement('div');
+  let id = currentUndoable.id;
+
+  div.classList.add('undoEntry');
+  div.id = `undo${id}`;
+  div.innerHTML = `<input type="checkbox" class="column0" checked><span class="column1">${currentUndoable.getLabel()}</span><span class="column2">\u2715</span>`;
+  undosList.insertBefore(div, undosList.firstChild);
+
+  let checkbox = document.querySelector(`#${div.id} input[type="checkbox"]`);
+  checkbox.addEventListener('click', e => {
+    if (checkbox.checked) {
+      redo(id, e.shiftKey);
+    } else {
+      undo(id, e.shiftKey);
+    }
+  });
+
+  let deleteButton = document.querySelector(`#${div.id} > .column2`);
+  deleteButton.addEventListener('click', e => {
+    undo(id, e.shiftKey, true);
+  });
+
+  currentUndoable.checkbox = checkbox;
+  currentUndoable.div = div;
+
+  undos.push(currentUndoable);
+  currentUndoable = null;
+}
+
+function onMouseUp(e) {
+  if (currentUndoable) {
+    addUndoable();
+  }
+}
+
 function onMouseMove(e) {
+  if (!image) return;
+
   let newMouseAt = mouseToPixels(e.clientX, e.clientY);
   if (isOverImage(newMouseAt)) {
     canvas.classList.add('imageHovered');
@@ -430,17 +625,16 @@ function onMouseMove(e) {
 
 function onReady() {
   canvas = document.getElementById('canvas');
-
-  canvas.addEventListener('mousedown', onMouseDown);
-  canvas.addEventListener('mousemove', onMouseMove);
+  undosList = document.getElementById('undosList');
+  channelsRoot = document.getElementById('channelsRoot');
 
   gl = canvas.getContext('webgl2');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
   createBackground();
   createImage();
   render();
 
-  channelsRoot = document.getElementById('channelsRoot');
   registerCallbacks();
   onSize();
 }
@@ -480,6 +674,10 @@ function registerCallbacks() {
       activateTool(e.srcElement);
     });
   }
+
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
 }
 
 function activateTool(div) {
