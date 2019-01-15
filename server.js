@@ -114,9 +114,10 @@ function createWindow() {
     let image;
     let path;
     
-    // console.log("process.argv:", process.argv);
-    if (argv.length == 1) {
-      path = process.argv[2];
+    console.log("---- argv:", argv);
+    if (argv._.length == 1) {
+      path = argv._[0];
+      console.log("path:", path);
       image = sharp(path);
     } else {
       path = null;
@@ -130,7 +131,7 @@ function createWindow() {
       });
     }
 
-    // console.log("image:", image);
+    console.log("image:", image);
     image
       .raw()
       .metadata()

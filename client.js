@@ -198,6 +198,14 @@ class Undoable {
   }
 }
 
+function cloneBuffer(buffer) {
+  let newBuffer = new Uint8Array(buffer.length);
+  for (let i = 0; i < newBuffer.length; ++i) {
+    newBuffer[i] = buffer[i];
+  }
+  return newBuffer;
+}
+
 class UndoablePixels extends Undoable {
   constructor(id) {
     super(id);
@@ -207,6 +215,7 @@ class UndoablePixels extends Undoable {
   setPixelsToLatest(history) {
     for (let pixel of this.pixels.values()) {
       image.set(pixel.x, pixel.y, history.getMostRecentColor(pixel.x, pixel.y));
+      imageTexture.uploadPixel(pixel.x, pixel.y);
     }
   }
 
@@ -257,7 +266,6 @@ class Image {
     this.bytes[start + 1] = rgb[1];
     this.bytes[start + 2] = rgb[2];
     this.bytes[start + 3] = rgb[3];
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, c, r, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.bytes, (r * this.width + c) * 4);
   }
 
   get(c, r) {
@@ -363,6 +371,89 @@ class Image {
 
   set height(value) {
     this.size[1] = value;
+  }
+
+  resize(t, r, b, l) {
+    let extractInset = [0, 0];
+    let extractSize = [0, 0];
+
+    if (l < 0) {
+      extractInset[0] = -l;
+      l = 0;
+    }
+
+    extractSize[0] = this.width - extractInset[0];
+    if (r < 0) {
+      extractSize[0] += r;
+      r = 0;
+    }
+
+    if (t < 0) {
+      extractInset[1] = -t;
+      t = 0;
+    }
+
+    extractSize[1] = this.height - extractInset[1];
+    if (b < 0) {
+      extractSize[1] += b;
+      b = 0;
+    }
+
+    console.log("extractInset:", extractInset);
+    console.log("extractSize:", extractSize);
+    // console.log("this.bytes:", this.bytes);
+    // console.log("this.width:", this.width);
+    // console.log("this.height:", this.height);
+    // console.log("this.nchannels:", this.nchannels);
+
+    // let buffer = cloneBuffer(this.bytes);
+    // console.log("this.bytes:", this.bytes);
+    // console.log("buffer:", buffer);
+
+    sharp(this.bytes, {
+      raw: {
+        width: this.width,
+        height: this.height,
+        channels: this.nchannels,
+      }
+    }).extract({
+      left: extractInset[0],
+      top: extractInset[1],
+      width: extractSize[0],
+      height: extractSize[1],
+    }).extend({
+      left: l,
+      right: r,
+      top: t,
+      bottom: b,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    }).raw().toBuffer((error, data, info) => {
+      // Not sure why I need to force a copy of data, but Electron was
+      // disconnecting when I wasn't.
+      this.bytes = Buffer.from(data);
+
+      this.size = [info.width, info.height];
+      imageTexture.upload();
+      updateProjection();
+      render();
+    });
+  }
+}
+
+class Texture {
+  constructor(image) {
+    this.image = image;
+    this.textureId = createTexture(gl, image.width, image.height, image.nchannels, image.bytes);
+  }
+
+  uploadPixel(c, r) {
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, c, r, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.image.bytes, (r * this.image.width + c) * 4);
+  }
+
+  upload() {
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.textureId);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.image.width, this.image.height, 0, this.image.nchannels == 4 ? gl.RGBA : gl.RGB, gl.UNSIGNED_BYTE, this.image.bytes);
   }
 }
 
@@ -652,6 +743,7 @@ function drawPixel(p) {
   if (p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height) {
     history.current.add(p.x, p.y, selectedColor.slice(0));
     image.set(p.x, p.y, selectedColor);
+    imageTexture.uploadPixel(p.x, p.y);
   }
 }
 
@@ -669,7 +761,7 @@ function onMouseDown(e) {
 
   if (activeToolDiv == tools.pencil) {
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+    gl.bindTexture(gl.TEXTURE_2D, imageTexture.textureId);
     history.begin(new UndoablePixels());
     drawPixel(mouseAt);
     render();
@@ -697,6 +789,7 @@ function onMouseUp(e) {
     if (isOverImage(newMouseAt)) {
       history.begin(new UndoablePixels());
       image.fill(newMouseAt.x, newMouseAt.y, selectedColor, e.shiftKey);
+      imageTexture.upload();
       render();
     }
   }
@@ -726,15 +819,22 @@ function onMouseMove(e) {
   }
 
   if (isOverImage(newMouseAt)) {
-    canvas.classList.add('imageHovered');
+    if (activeToolDiv == tools.pencil) {
+      canvas.classList.add('pencilHovered');
+    } else if (activeToolDiv == tools.bucket) {
+      console.log("bucket!!!");
+      canvas.classList.add('bucketHovered');
+    }
   } else {
-    canvas.classList.remove('imageHovered');
+    console.log("remive");
+    canvas.classList.remove('pencilHovered');
+    canvas.classList.remove('bucketHovered');
   }
 
   if (activeToolDiv == tools.pencil) {
     if (e.buttons == 1) {
       gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+      gl.bindTexture(gl.TEXTURE_2D, imageTexture.textureId);
       drawLine(mouseAt, newMouseAt);
       render();
       mouseAt = newMouseAt;
@@ -804,7 +904,6 @@ function registerCallbacks() {
 
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
-  // canvas.addEventListener('mouseup', onMouseUp);
   window.addEventListener('mouseup', onMouseUp);
 
   window.addEventListener('keydown', e => {
@@ -816,6 +915,27 @@ function registerCallbacks() {
       activateTool(tools.bucket);
     }
   });
+
+  let resizeLeftBox = document.getElementById('resizeLeftBox');
+  let resizeRightBox = document.getElementById('resizeRightBox');
+  let resizeTopBox = document.getElementById('resizeTopBox');
+  let resizeBottomBox = document.getElementById('resizeBottomBox');
+  let resizeButton = document.getElementById('resizeButton');
+  
+  resizeButton.addEventListener('click', () => {
+    let l = parseInt(resizeLeftBox.value);
+    let r = parseInt(resizeRightBox.value);
+    let b = parseInt(resizeBottomBox.value);
+    let t = parseInt(resizeTopBox.value);
+
+    if (isNaN(l)) l = 0;
+    if (isNaN(r)) r = 0;
+    if (isNaN(t)) t = 0;
+    if (isNaN(b)) b = 0;
+
+    image.resize(t, r, b, l);
+    updateProjection();
+  });
 }
 
 function activateTool(div) {
@@ -824,6 +944,10 @@ function activateTool(div) {
   }
   activeToolDiv = div;
   activeToolDiv.classList.add('active');
+
+  console.log("rrrrrr");
+  canvas.classList.remove('pencilHovered');
+  canvas.classList.remove('bucketHovered');
 }
 
 function syncColor() {
@@ -942,12 +1066,13 @@ function updateProjection() {
 }
 
 function loadImage(path, width, height, nchannels, pixels) {
+  console.log("pixels:", pixels);
   imagePath = path;
   image = new Image(width, height, nchannels, pixels);
   history = new UndoHistory(image.clone());
   updateProjection();
   gl.activeTexture(gl.TEXTURE1);
-  imageTexture = createTexture(gl, width, height, nchannels, pixels);
+  imageTexture = new Texture(image);
   render();
 }
 

@@ -64,8 +64,12 @@ body {
   cursor: auto;
 }
 
-#canvas.imageHovered {
+#canvas.pencilHovered {
   cursor: url(images/pencil.png) 6 21, crosshair;
+}
+
+#canvas.bucketHovered {
+  cursor: url(images/bucket.png) 19 21, crosshair;
 }
 
 .panelHeader {
@@ -105,8 +109,8 @@ body {
 .tool {
   display: inline-block;
   font-size: 24px;
-  width: 30px;
-  height: 30px;
+  width: 56px;
+  height: 56px;
   font-family: sans-serif;
   text-align: center;
   background-color: rgb(180, 180, 180);
@@ -118,6 +122,9 @@ body {
   -webkit-user-drag: none;
   -webkit-touch-callout: none;
   pointer-events: none;
+  image-rendering: pixelated;
+  width: 56px;
+  height: 56px;
 }
 
 .tool.active {
