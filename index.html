@@ -30,12 +30,14 @@
 
       <div class="panel">
         <div class="panelHeader">Size</div>
-        <div class="panelBody">
-          <input type="text" placeholder="left" id="resizeLeftBox">
-          <input type="text" placeholder="right" id="resizeRightBox">
-          <input type="text" placeholder="top" id="resizeTopBox">
-          <input type="text" placeholder="bottom" id="resizeBottomBox">
-          <button id="resizeButton">Resize</button>
+        <div class="panelBody" id="sizePanelBody">
+          <div id="resizeOffsets">
+            <input type="text" size="4" tabindex="1" placeholder="top" id="resizeTopBox">
+            <input type="text" size="4" tabindex="3" placeholder="right" id="resizeRightBox">
+            <input type="text" size="4" tabindex="4" placeholder="bottom" id="resizeBottomBox">
+            <input type="text" size="4" tabindex="2" placeholder="left" id="resizeLeftBox">
+          </div>
+          <button id="resizeButton"></button>
         </div>
       </div>
 

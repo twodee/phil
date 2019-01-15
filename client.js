@@ -14,6 +14,12 @@ let rgbWidgets;
 let channelsRoot;
 let selectedColor = [0, 255, 0, 255];
 
+let resizeButton;
+let resizeLeftBox;
+let resizeRightBox;
+let resizeTopBox;
+let resizeBottomBox;
+
 let lockAxis = null;
 
 let integerPattern = /^\d+$/;
@@ -851,6 +857,11 @@ function onReady() {
   canvas = document.getElementById('canvas');
   undosList = document.getElementById('undosList');
   channelsRoot = document.getElementById('channelsRoot');
+  resizeButton = document.getElementById('resizeButton');
+  resizeLeftBox = document.getElementById('resizeLeftBox');
+  resizeRightBox = document.getElementById('resizeRightBox');
+  resizeTopBox = document.getElementById('resizeTopBox');
+  resizeBottomBox = document.getElementById('resizeBottomBox');
 
   gl = canvas.getContext('webgl2');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -913,12 +924,6 @@ function registerCallbacks() {
       activateTool(tools.bucket);
     }
   });
-
-  let resizeLeftBox = document.getElementById('resizeLeftBox');
-  let resizeRightBox = document.getElementById('resizeRightBox');
-  let resizeTopBox = document.getElementById('resizeTopBox');
-  let resizeBottomBox = document.getElementById('resizeBottomBox');
-  let resizeButton = document.getElementById('resizeButton');
   
   resizeButton.addEventListener('click', () => {
     let l = parseInt(resizeLeftBox.value);
@@ -934,6 +939,11 @@ function registerCallbacks() {
     image.resize(t, r, b, l);
     updateProjection();
   });
+
+  resizeTopBox.addEventListener('input', syncResizeButton);
+  resizeRightBox.addEventListener('input', syncResizeButton);
+  resizeBottomBox.addEventListener('input', syncResizeButton);
+  resizeLeftBox.addEventListener('input', syncResizeButton);
 }
 
 function activateTool(div) {
@@ -1070,6 +1080,21 @@ function loadImage(path, width, height, nchannels, pixels) {
   gl.activeTexture(gl.TEXTURE1);
   imageTexture = new Texture(image);
   render();
+  syncResizeButton();
+}
+
+function syncResizeButton() {
+  let l = parseInt(resizeLeftBox.value);
+  let r = parseInt(resizeRightBox.value);
+  let b = parseInt(resizeBottomBox.value);
+  let t = parseInt(resizeTopBox.value);
+
+  if (isNaN(l)) l = 0;
+  if (isNaN(r)) r = 0;
+  if (isNaN(t)) t = 0;
+  if (isNaN(b)) b = 0;
+
+  resizeButton.innerText = `Resize to ${image.width + l + r}x${image.height + t + b}`;
 }
 
 function saveImage(path) {

@@ -115,6 +115,7 @@ body {
   text-align: center;
   background-color: rgb(180, 180, 180);
   border-radius: 5px;
+  cursor: pointer;
 }
 
 .tool > img {
@@ -138,3 +139,37 @@ body {
 .panelBody {
   user-select: none;
 }
+
+#resizeOffsets {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-column-gap: 5px;
+  grid-row-gap: 5px;
+  margin-bottom: 10px;
+}
+
+#resizeTopBox {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+#resizeBottomBox {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+#resizeRightBox {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+#resizeLeftBox {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+#sizePanelBody {
+  text-align: center;
+}
+
+
