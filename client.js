@@ -146,6 +146,17 @@ class UndoHistory {
     this.modify(id, includeSuccessors, true);
   }
 
+  getMostRecentSize() {
+    for (let i = this.undos.length - 1; i >= 0; --i) {
+      if (this.undos[i].isDone) {
+        if (this.undos[i] instanceof UndoableImage) {
+          return this.undos[i].newImage.size;
+        }
+      }
+    }
+    return this.original.size;
+  }
+
   getMostRecentColor(c, r) {
     for (let i = this.undos.length - 1; i >= 0; --i) {
       if (this.undos[i].isDone) {
@@ -174,8 +185,8 @@ class Undoable {
   getLabel() {
     let label = '';
     
-    label += this.timestamp.getFullYear();
-    label += '/';
+    // label += this.timestamp.getFullYear();
+    // label += '/';
     label += this.timestamp.getMonth() + 1;
     label += '/';
     label += this.timestamp.getDate();
@@ -204,12 +215,39 @@ class Undoable {
   }
 }
 
-function cloneBuffer(buffer) {
-  let newBuffer = new Uint8Array(buffer.length);
-  for (let i = 0; i < newBuffer.length; ++i) {
-    newBuffer[i] = buffer[i];
+class UndoableImage extends Undoable {
+  constructor(id) {
+    super(id);
+    this.newImage = null;
   }
-  return newBuffer;
+
+  setPixelsToLatest(history) {
+    let size = history.getMostRecentSize();
+    image.resize(size[0], size[1]);
+
+    for (let r = 0; r < image.height; ++r) {
+      for (let c = 0; c < image.width; ++c) {
+        let color = history.getMostRecentColor(c, r);
+        image.set(c, r, color);
+      }
+    }
+
+    imageTexture.upload();
+    updateProjection();
+  }
+
+  getLabel() {
+    return super.getLabel() + ' (resize to ' + this.newImage.width + 'x' + this.newImage.height + ')';
+  }
+
+  getColor(x, y) {
+    let p = new Vector2(x, y);
+    if (this.newImage.containsPixel(p)) {
+      return this.newImage.get(x, y);
+    } else {
+      return null;
+    }
+  }
 }
 
 class UndoablePixels extends Undoable {
@@ -243,6 +281,8 @@ class UndoablePixels extends Undoable {
     let key = x + ',' + y;
     if (this.pixels.has(key)) {
       return this.pixels.get(key).color;
+    } else {
+      return null;
     }
   }
 }
@@ -255,15 +295,15 @@ class Image {
   }
 
   clone() {
-    let newBytes = new Uint8Array(this.bytes.length);
-    for (let i = 0; i < newBytes.length; ++i) {
-      newBytes[i] = this.bytes[i];
-    }
-    return new Image(this.width, this.height, this.nchannels, newBytes);
+    return new Image(this.width, this.height, this.nchannels, Buffer.from(this.bytes));
   }
 
   aspectRatio() {
     return this.width / this.height;
+  }
+
+  containsPixel(p) {
+    return p.x >= 0 && p.x < this.width && p.y >= 0 && p.y < this.height;
   }
 
   set(c, r, rgb) {
@@ -379,7 +419,13 @@ class Image {
     this.size[1] = value;
   }
 
-  resize(t, r, b, l) {
+  resize(newWidth, newHeight) {
+    this.bytes = Buffer.alloc(newWidth * newHeight * 4, 255);
+    this.size[0] = newWidth;
+    this.size[1] = newHeight;
+  }
+
+  offsetSize(t, r, b, l) {
     let extractInset = [0, 0];
     let extractSize = [0, 0];
 
@@ -405,17 +451,6 @@ class Image {
       b = 0;
     }
 
-    console.log("extractInset:", extractInset);
-    console.log("extractSize:", extractSize);
-    // console.log("this.bytes:", this.bytes);
-    // console.log("this.width:", this.width);
-    // console.log("this.height:", this.height);
-    // console.log("this.nchannels:", this.nchannels);
-
-    // let buffer = cloneBuffer(this.bytes);
-    // console.log("this.bytes:", this.bytes);
-    // console.log("buffer:", buffer);
-
     sharp(this.bytes, {
       raw: {
         width: this.width,
@@ -437,11 +472,18 @@ class Image {
       // Not sure why I need to force a copy of data, but Electron was
       // disconnecting when I wasn't.
       this.bytes = Buffer.from(data);
-
       this.size = [info.width, info.height];
       imageTexture.upload();
       updateProjection();
       render();
+
+      resizeTopBox.value = '';
+      resizeRightBox.value = '';
+      resizeBottomBox.value = '';
+      resizeLeftBox.value = '';
+
+      history.current.newImage = image.clone();
+      history.commit();
     });
   }
 }
@@ -936,8 +978,8 @@ function registerCallbacks() {
     if (isNaN(t)) t = 0;
     if (isNaN(b)) b = 0;
 
-    image.resize(t, r, b, l);
-    updateProjection();
+    history.begin(new UndoableImage());
+    image.offsetSize(t, r, b, l);
   });
 
   resizeTopBox.addEventListener('input', syncResizeButton);
