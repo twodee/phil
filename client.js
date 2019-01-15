@@ -822,11 +822,9 @@ function onMouseMove(e) {
     if (activeToolDiv == tools.pencil) {
       canvas.classList.add('pencilHovered');
     } else if (activeToolDiv == tools.bucket) {
-      console.log("bucket!!!");
       canvas.classList.add('bucketHovered');
     }
   } else {
-    console.log("remive");
     canvas.classList.remove('pencilHovered');
     canvas.classList.remove('bucketHovered');
   }
@@ -945,7 +943,6 @@ function activateTool(div) {
   activeToolDiv = div;
   activeToolDiv.classList.add('active');
 
-  console.log("rrrrrr");
   canvas.classList.remove('pencilHovered');
   canvas.classList.remove('bucketHovered');
 }
@@ -1066,7 +1063,6 @@ function updateProjection() {
 }
 
 function loadImage(path, width, height, nchannels, pixels) {
-  console.log("pixels:", pixels);
   imagePath = path;
   image = new Image(width, height, nchannels, pixels);
   history = new UndoHistory(image.clone());

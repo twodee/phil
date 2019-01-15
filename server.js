@@ -106,7 +106,11 @@ function createMenu() {
 }
 
 function createWindow() {
-  var browser = new BrowserWindow({ width: 800, height: 600 });
+  var browser = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: { nodeIntegration: true },
+  });
   browser.loadFile('index.html');
   // browser.webContents.openDevTools({mode: 'bottom'});
 
@@ -114,10 +118,8 @@ function createWindow() {
     let image;
     let path;
     
-    console.log("---- argv:", argv);
     if (argv._.length == 1) {
       path = argv._[0];
-      console.log("path:", path);
       image = sharp(path);
     } else {
       path = null;
@@ -131,7 +133,6 @@ function createWindow() {
       });
     }
 
-    console.log("image:", image);
     image
       .raw()
       .metadata()
@@ -148,9 +149,9 @@ function createWindow() {
         }
 
         image.toBuffer((error, data, info) => {
-          console.log("error:", error);
-          console.log("data:", data);
-          console.log("info:", info);
+          // console.log("error:", error);
+          // console.log("data:", data);
+          // console.log("info:", info);
           browser.webContents.send('loadImage', path, info.width, info.height, info.channels, data);
         });
       });
