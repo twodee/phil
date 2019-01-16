@@ -57,6 +57,11 @@ class UndoHistory {
   commit() {
     if (!this.current) return;
 
+    if (!this.current.isEffective) {
+      this.current = null;
+      return;
+    }
+
     this.current.id = this.latestId;
     ++this.latestId;
 
@@ -221,6 +226,10 @@ class UndoableImage extends Undoable {
     this.newImage = null;
   }
 
+  get isEffective() {
+    return this.newImage != null;
+  }
+
   setPixelsToLatest(history) {
     let size = history.getMostRecentSize();
     image.resize(size[0], size[1]);
@@ -258,9 +267,15 @@ class UndoablePixels extends Undoable {
 
   setPixelsToLatest(history) {
     for (let pixel of this.pixels.values()) {
-      image.set(pixel.x, pixel.y, history.getMostRecentColor(pixel.x, pixel.y));
-      imageTexture.uploadPixel(pixel.x, pixel.y);
+      if (image.containsPixel(pixel)) {
+        image.set(pixel.x, pixel.y, history.getMostRecentColor(pixel.x, pixel.y));
+        imageTexture.uploadPixel(pixel.x, pixel.y);
+      }
     }
+  }
+
+  get isEffective() {
+    return this.pixels.size > 0;
   }
 
   getLabel() {
@@ -419,72 +434,67 @@ class Image {
     this.size[1] = value;
   }
 
+  extract(t, r, b, l) {
+    let newWidth = this.width - l - r;
+    let newHeight = this.height - t - b;
+    let newBytes = Buffer.alloc(newWidth * newHeight * 4);
+
+    for (let rNew = 0; rNew < newHeight; ++rNew) {
+      for (let cNew = 0; cNew < newWidth; ++cNew) {
+        let rOld = rNew + t;
+        let cOld = cNew + l;
+        let iOld = 4 * (rOld * this.width + cOld);
+        let iNew = 4 * (rNew * newWidth + cNew);
+        this.bytes.copy(newBytes, iNew, iOld, iOld + 4);
+      }
+    }
+
+    this.width = newWidth;
+    this.height = newHeight;
+    this.bytes = newBytes;
+  }
+
+  extend(t, r, b, l) {
+    let newWidth = this.width + l + r;
+    let newHeight = this.height + t + b;
+    let newBytes = Buffer.alloc(newWidth * newHeight * 4);
+
+    for (let rOld = 0; rOld < this.height; ++rOld) {
+      for (let cOld = 0; cOld < this.width; ++cOld) {
+        let rNew = rOld + t;
+        let cNew = cOld + l;
+        let iOld = 4 * (rOld * this.width + cOld);
+        let iNew = 4 * (rNew * newWidth + cNew);
+        this.bytes.copy(newBytes, iNew, iOld, iOld + 4);
+      }
+    }
+
+    this.width = newWidth;
+    this.height = newHeight;
+    this.bytes = newBytes;
+    console.log("this.size:", this.size);
+  }
+
   resize(newWidth, newHeight) {
     this.bytes = Buffer.alloc(newWidth * newHeight * 4, 255);
     this.size[0] = newWidth;
     this.size[1] = newHeight;
   }
 
-  offsetSize(t, r, b, l) {
-    let extractInset = [0, 0];
-    let extractSize = [0, 0];
+  resizeDelta(t, r, b, l) {
+    this.extract(
+      t < 0 ? -t : 0,
+      r < 0 ? -r : 0,
+      b < 0 ? -b : 0,
+      l < 0 ? -l : 0
+    );
 
-    if (l < 0) {
-      extractInset[0] = -l;
-      l = 0;
-    }
-
-    extractSize[0] = this.width - extractInset[0];
-    if (r < 0) {
-      extractSize[0] += r;
-      r = 0;
-    }
-
-    if (t < 0) {
-      extractInset[1] = -t;
-      t = 0;
-    }
-
-    extractSize[1] = this.height - extractInset[1];
-    if (b < 0) {
-      extractSize[1] += b;
-      b = 0;
-    }
-
-    sharp(this.bytes, {
-      raw: {
-        width: this.width,
-        height: this.height,
-        channels: this.nchannels,
-      }
-    }).extract({
-      left: extractInset[0],
-      top: extractInset[1],
-      width: extractSize[0],
-      height: extractSize[1],
-    }).extend({
-      left: l,
-      right: r,
-      top: t,
-      bottom: b,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    }).raw().toBuffer((error, data, info) => {
-      // Not sure why I need to force a copy of data, but Electron was
-      // disconnecting when I wasn't.
-      this.bytes = Buffer.from(data);
-      this.size = [info.width, info.height];
-      imageTexture.upload();
-      updateProjection();
-      render();
-
-      resizeTopBox.value = '';
-      resizeRightBox.value = '';
-      resizeBottomBox.value = '';
-      resizeLeftBox.value = '';
-
-      history.current.newImage = image.clone();
-      history.commit();
-    });
+    this.extend(
+      t > 0 ? t : 0,
+      r > 0 ? r : 0,
+      b > 0 ? b : 0,
+      l > 0 ? l : 0
+    );
   }
 }
 
@@ -979,7 +989,19 @@ function registerCallbacks() {
     if (isNaN(b)) b = 0;
 
     history.begin(new UndoableImage());
-    image.offsetSize(t, r, b, l);
+    image.resizeDelta(t, r, b, l);
+
+    imageTexture.upload();
+    updateProjection();
+    render();
+
+    resizeTopBox.value = '';
+    resizeRightBox.value = '';
+    resizeBottomBox.value = '';
+    resizeLeftBox.value = '';
+
+    history.current.newImage = image.clone();
+    history.commit();
   });
 
   resizeTopBox.addEventListener('input', syncResizeButton);

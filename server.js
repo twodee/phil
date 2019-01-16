@@ -106,56 +106,65 @@ function createMenu() {
 }
 
 function createWindow() {
-  var browser = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: { nodeIntegration: true },
-  });
-  browser.loadFile('index.html');
-  // browser.webContents.openDevTools({mode: 'bottom'});
+  let image;
+  let path;
+  
+  if (argv._.length == 1) {
+    path = argv._[0];
+    image = sharp(path);
+  } else if (argv._.length == 2) {
+    path = null;
+    let width = parseInt(argv._[0]);
+    let height = parseInt(argv._[1]);
 
-  browser.webContents.on('did-finish-load', () => {
-    let image;
-    let path;
-    
-    if (argv._.length == 1) {
-      path = argv._[0];
-      image = sharp(path);
-    } else {
-      path = null;
+    if (!isNaN(width) && !isNaN(height)) {
       image = sharp({
         create: {
-          width: parseInt(argv._[0]),
-          height: parseInt(argv._[1]),
+          width: width,
+          height: height,
           channels: 4,
           background: { r: argv.background[0], g: argv.background[1], b: argv.background[2], alpha: argv.background[3] },
         }
       });
     }
+  }
 
-    image
-      .raw()
-      .metadata()
-      .then(meta => {
+  if (!image) {
+    console.error("Usage: npm start -- path");
+    console.error("       npm start -- width height");
+    process.exit(0);
+  }
 
-        if (meta.channels == 3) {
-          image = image.joinChannel(Buffer.alloc(meta.width * meta.height, 255), {
-            raw: {
-              width: meta.width,
-              height: meta.height,
-              channels: 1
-            }
-          })
-        }
+  image
+    .raw()
+    .metadata()
+    .then(meta => {
 
-        image.toBuffer((error, data, info) => {
-          // console.log("error:", error);
-          // console.log("data:", data);
-          // console.log("info:", info);
+      if (meta.channels == 3) {
+        image = image.joinChannel(Buffer.alloc(meta.width * meta.height, 255), {
+          raw: {
+            width: meta.width,
+            height: meta.height,
+            channels: 1
+          }
+        })
+      }
+
+      image.toBuffer((error, data, info) => {
+        var browser = new BrowserWindow({
+          width: 800,
+          height: 600,
+          webPreferences: { nodeIntegration: true },
+        });
+
+        browser.loadFile('index.html');
+        // browser.webContents.openDevTools({mode: 'bottom'});
+
+        browser.webContents.on('did-finish-load', () => {
           browser.webContents.send('loadImage', path, info.width, info.height, info.channels, data);
         });
       });
-  });
+    });
 }
 
 let argv;
@@ -174,7 +183,6 @@ app.on('ready', () => {
     argv.background[3] = parseFloat(argv.background[3]);
   }
 
-  console.log("argv:", argv);
   createMenu();
   createWindow();
 });
