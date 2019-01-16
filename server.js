@@ -54,9 +54,27 @@ function createMenu() {
 			submenu: [
 				{role: 'reload'},
 				{role: 'forcereload'},
-				{role: 'toggledevtools'},
+
+				// {role: 'toggledevtools'},
+				// {role: 'togglefullscreen'}
+
+        // The accelerators for some roles aren't working properly on Linux. I
+        // guess I'll "role" my own.
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: 'CommandOrControl+Shift+I',
+          click(item, focusedWindow) {
+            focusedWindow.toggleDevTools();
+          },
+        },
 				{type: 'separator'},
-				{role: 'togglefullscreen'}
+        {
+          label: 'Toggle Fullscreen',
+          accelerator: 'Alt+F11',
+          click(item, focusedWindow) {
+            focusedWindow.setFullScreen(!focusedWindow.isFullScreen());
+          },
+        },
 			]
 		},
 	];

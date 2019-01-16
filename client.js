@@ -825,7 +825,7 @@ function onMouseDown(e) {
     render();
   }
   
-  else if (activeToolDiv == tools.eyedropper) {
+  else if (activeToolDiv == tools.dropper) {
     if (isOverImage(mouseAt)) {
       selectColor(image.get(mouseAt.x, mouseAt.y));
     }
@@ -876,16 +876,7 @@ function onMouseMove(e) {
     newMouseAt.y = mouseAt.y;
   }
 
-  if (isOverImage(newMouseAt)) {
-    if (activeToolDiv == tools.pencil) {
-      canvas.classList.add('pencilHovered');
-    } else if (activeToolDiv == tools.bucket) {
-      canvas.classList.add('bucketHovered');
-    }
-  } else {
-    canvas.classList.remove('pencilHovered');
-    canvas.classList.remove('bucketHovered');
-  }
+  syncCursor(newMouseAt);
 
   if (activeToolDiv == tools.pencil) {
     if (e.buttons == 1) {
@@ -897,10 +888,26 @@ function onMouseMove(e) {
     }
   }
 
-  else if (activeToolDiv == tools.eyedropper) {
+  else if (activeToolDiv == tools.dropper) {
     mouseAt = newMouseAt;
     if (e.buttons == 1 && isOverImage(mouseAt)) {
       selectColor(image.get(mouseAt.x, mouseAt.y));
+    }
+  }
+}
+
+function syncCursor(mousePosition) {
+  canvas.classList.remove('pencilHovered');
+  canvas.classList.remove('bucketHovered');
+  canvas.classList.remove('dropperHovered');
+
+  if (mousePosition && isOverImage(mousePosition)) {
+    if (activeToolDiv == tools.pencil) {
+      canvas.classList.add('pencilHovered');
+    } else if (activeToolDiv == tools.bucket) {
+      canvas.classList.add('bucketHovered');
+    } else if (activeToolDiv == tools.dropper) {
+      canvas.classList.add('dropperHovered');
     }
   }
 }
@@ -953,7 +960,7 @@ function registerCallbacks() {
 
   // Tools
   tools.pencil = document.getElementById('pencil');
-  tools.eyedropper = document.getElementById('eyedropper');
+  tools.dropper = document.getElementById('dropper');
   tools.bucket = document.getElementById('bucket');
 
   activateTool(tools.pencil);
@@ -971,7 +978,7 @@ function registerCallbacks() {
     if (e.key == 'p') {
       activateTool(tools.pencil);
     } else if (e.key == 'e') {
-      activateTool(tools.eyedropper);
+      activateTool(tools.dropper);
     } else if (e.key == 'b') {
       activateTool(tools.bucket);
     }
@@ -1016,9 +1023,7 @@ function activateTool(div) {
   }
   activeToolDiv = div;
   activeToolDiv.classList.add('active');
-
-  canvas.classList.remove('pencilHovered');
-  canvas.classList.remove('bucketHovered');
+  syncCursor(mouseAt);
 }
 
 function syncColor() {

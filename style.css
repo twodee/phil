@@ -72,6 +72,10 @@ body {
   cursor: url(images/bucket.png) 19 21, crosshair;
 }
 
+#canvas.dropperHovered {
+  cursor: url(images/dropper.png) 7 20, crosshair;
+}
+
 .panelHeader {
   font-family: sans-serif;
   margin-bottom: 1em;
