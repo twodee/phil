@@ -137,11 +137,38 @@ body {
 }
 
 .panel {
-  margin-bottom: 10px;
+  padding-bottom: 10px;
+  padding-top: 10px;
+  border-bottom: 1px solid rgb(150, 150, 150);
+}
+
+.panel:first-child {
+  padding-top: 0;
+}
+
+.panelHeader {
+  margin: 0;
 }
 
 .panelBody {
   user-select: none;
+  display: none;
+  padding-top: 5px;
+}
+
+.panelHeader.open ~ .panelBody {
+  display: block;
+}
+
+.panelHeader:before {
+  content: '\25b8';
+  margin-right: 5px;
+  display: inline-block;
+  width: 10px;
+}
+
+.panelHeader.open:before {
+  content: '\25be';
 }
 
 #resizeOffsets {
@@ -175,5 +202,3 @@ body {
 #sizePanelBody {
   text-align: center;
 }
-
-

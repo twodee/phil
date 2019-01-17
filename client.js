@@ -1015,6 +1015,17 @@ function registerCallbacks() {
   resizeRightBox.addEventListener('input', syncResizeButton);
   resizeBottomBox.addEventListener('input', syncResizeButton);
   resizeLeftBox.addEventListener('input', syncResizeButton);
+
+  let headers = document.querySelectorAll('.panelHeader');
+  for (let header of headers) {
+    header.addEventListener('click', e => {
+      let headerDiv = e.target;
+      headerDiv.classList.toggle('open');
+      if (headerDiv.classList.contains('open')) {
+      } else {
+      }
+    });
+  }
 }
 
 function activateTool(div) {
