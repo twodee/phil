@@ -1,4 +1,4 @@
-const { app, Menu, BrowserWindow } = require('electron');
+const { app, Menu, BrowserWindow, ipcMain } = require('electron');
 const minimist = require('minimist');
 const sharp = require('sharp');
 // https://sharp.dimens.io
@@ -203,4 +203,29 @@ app.on('ready', () => {
 
   createMenu();
   createWindow();
+});
+
+let colorHistory = [];
+ipcMain.on('add-color', (event, color) => {
+  let match = colorHistory.find(entry => entry.color[0] == color[0] && entry.color[1] == color[1] && entry.color[2] == color[2] && entry.color[3] == color[3]);
+
+  if (match) {
+    match.time = Date.now();
+    if (colorHistory.length > 0 && match == colorHistory[colorHistory.length - 1]) {
+      return;
+    }
+    colorHistory.sort((a, b) => {
+      if (a.time < b.time) {
+        return -1;
+      } else if (a.time > b.time) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+  } else {
+    colorHistory.push({ time: Date.now(), color: color });
+  }
+
+  event.sender.send('update-color-history', colorHistory);
 });

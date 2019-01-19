@@ -202,3 +202,19 @@ body {
 #sizePanelBody {
   text-align: center;
 }
+
+#colorHistoryRoot {
+  margin-top: 10px;
+}
+
+.colorHistoryEntry {
+  display: inline-block;
+  width: 25px;
+  height: 25px;
+  outline: none;
+  cursor: pointer;
+}
+
+.colorHistoryEntry:hover {
+  border: 1px solid black;
+}

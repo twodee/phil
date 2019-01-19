@@ -1,4 +1,5 @@
 const sharp = require('sharp');
+const { ipcRenderer } = require('electron')
 const fsdialog = require('electron').remote.dialog;
 
 // Tools
@@ -12,6 +13,7 @@ let history;
 // Color
 let rgbWidgets;
 let channelsRoot;
+let colorHistoryRoot;
 let selectedColor = [0, 255, 0, 255];
 
 let resizeButton;
@@ -802,6 +804,7 @@ function drawPixel(p) {
     history.current.add(p.x, p.y, selectedColor.slice(0));
     image.set(p.x, p.y, selectedColor);
     imageTexture.uploadPixel(p.x, p.y);
+    rememberColor();
   }
 }
 
@@ -848,6 +851,7 @@ function onMouseUp(e) {
       history.begin(new UndoablePixels());
       image.fill(newMouseAt.x, newMouseAt.y, selectedColor, e.shiftKey);
       imageTexture.upload();
+      rememberColor();
       render();
     }
   }
@@ -916,6 +920,7 @@ function onReady() {
   canvas = document.getElementById('canvas');
   undosList = document.getElementById('undosList');
   channelsRoot = document.getElementById('channelsRoot');
+  colorHistoryRoot = document.getElementById('colorHistoryRoot');
   resizeButton = document.getElementById('resizeButton');
   resizeLeftBox = document.getElementById('resizeLeftBox');
   resizeRightBox = document.getElementById('resizeRightBox');
@@ -1035,6 +1040,10 @@ function activateTool(div) {
   activeToolDiv = div;
   activeToolDiv.classList.add('active');
   syncCursor(mouseAt);
+}
+
+function rememberColor() {
+  ipcRenderer.send('add-color', selectedColor);
 }
 
 function syncColor() {
@@ -1225,12 +1234,18 @@ function saveAs() {
   });
 }
 
-require('electron').ipcRenderer.on('saveAs', function(event, data) {
+ipcRenderer.on('saveAs', function(event, data) {
   saveAs();
 });
 
-require('electron').ipcRenderer.on('save', function(event, data) {
+ipcRenderer.on('save', function(event, data) {
   saveImage(imagePath);
+});
+
+ipcRenderer.on('update-color-history', function(event, history) {
+  let buttons = history.map(({ color }) => `<div class="colorHistoryEntry" style="background-color: rgb(${color[0]}, ${color[1]}, ${color[2]});"></div>`);
+  buttons.reverse();
+  colorHistoryRoot.innerHTML = buttons.join('\n');
 });
 
 window.addEventListener('load', onReady);
