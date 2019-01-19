@@ -1243,9 +1243,21 @@ ipcRenderer.on('save', function(event, data) {
 });
 
 ipcRenderer.on('update-color-history', function(event, history) {
-  let buttons = history.map(({ color }) => `<div class="colorHistoryEntry" style="background-color: rgb(${color[0]}, ${color[1]}, ${color[2]});"></div>`);
-  buttons.reverse();
-  colorHistoryRoot.innerHTML = buttons.join('\n');
+  while (colorHistoryRoot.firstChild) {
+    colorHistoryRoot.removeChild(colorHistoryRoot.firstChild);
+  }
+
+  for (let i = history.length - 1; i >= 0; --i) {
+    let color = history[i].color;
+    let button = document.createElement('div');
+    button.classList.add('colorHistoryEntry');
+    button.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    button.addEventListener('click', () => {
+      selectedColor = color;
+      syncWidgetsToColor();
+    });
+    colorHistoryRoot.appendChild(button);
+  }
 });
 
 window.addEventListener('load', onReady);
