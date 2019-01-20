@@ -9,5 +9,8 @@
     "electron": "^4.0.0",
     "electron-rebuild": "^1.8.2",
     "sharp": "^0.21.1"
+  },
+  "dependencies": {
+    "dialogs": "^1.1.20"
   }
 }

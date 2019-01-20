@@ -3,6 +3,9 @@ const minimist = require('minimist');
 const sharp = require('sharp');
 // https://sharp.dimens.io
 
+let colorHistory = [];
+let colorPalette = [];
+
 function createMenu() {
 	const template = [
 		{
@@ -205,8 +208,7 @@ app.on('ready', () => {
   createWindow();
 });
 
-let colorHistory = [];
-ipcMain.on('add-color', (event, color) => {
+ipcMain.on('remember-color', (event, color) => {
   let match = colorHistory.find(entry => entry.color[0] == color[0] && entry.color[1] == color[1] && entry.color[2] == color[2] && entry.color[3] == color[3]);
 
   if (match) {
@@ -228,4 +230,31 @@ ipcMain.on('add-color', (event, color) => {
   }
 
   event.sender.send('update-color-history', colorHistory);
+});
+
+ipcMain.on('unname-color', (event, name) => {
+  for (var i = colorPalette.length - 1; i >= 0; --i) {
+    if (colorPalette[i].name == name) {
+      colorPalette.splice(i, 1);
+    }
+  }
+
+  event.sender.send('update-color-palette', colorPalette);
+});
+
+ipcMain.on('name-color', (event, name, color) => {
+  let isNew = true;
+
+  for (var i = colorPalette.length - 1; i >= 0; --i) {
+    if (colorPalette[i].name == name) {
+      colorPalette[i].color = color;
+      isNew = false;
+    }
+  }
+
+  if (isNew) {
+    colorPalette.push({ name: name, color: color });
+  }
+
+  event.sender.send('update-color-palette', colorPalette);
 });

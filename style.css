@@ -2,7 +2,7 @@
   box-sizing: border-box;
 }
 
-span {
+span, legend {
   font-family: sans-serif;
 }
 
@@ -13,23 +13,23 @@ span {
   user-select: none;
 }
 
-.undoEntry {
+.grid3 {
   display: flex;
 }
 
-.undoEntry > .column0 {
+.grid3 > .column0 {
   flex: 0;
 }
 
-.undoEntry > .column1 {
+.grid3 > .column1 {
   flex: 1;
-  margin-left: 0.2em;
+  padding-left: 0.2em;
 }
 
-.undoEntry > .column2 {
+.grid3 > .column2 {
   flex: 0;
   color: red;
-  margin-right: 0.2em;
+  padding-right: 0.2em;
   cursor: pointer;
   user-select: none;
 }
@@ -207,14 +207,54 @@ body {
   margin-top: 10px;
 }
 
-.colorHistoryEntry {
+#colorPreview {
+  height: 30px;
+}
+
+.colorHistorySwatch {
   display: inline-block;
   width: 25px;
   height: 25px;
   outline: none;
   cursor: pointer;
+  margin: 3px;
 }
 
-.colorHistoryEntry:hover {
-  border: 1px solid black;
+.colorHistorySwatch:hover {
+  outline: 1px solid black;
+}
+
+.colorPaletteEntry {
+  cursor: pointer;
+  margin-bottom: 3px;
+  height: 25px;
+}
+
+.colorPaletteEntry > .column1 {
+  padding-right: 5px;
+  font-size: 14px;
+  line-height: 25px;
+}
+
+.colorPaletteSwatch {
+  display: inline-block;
+  min-width: 25px;
+  height: 100%;
+  vertical-align: text-bottom;
+}
+
+.colorPaletteSwatch:hover, .colorPaletteSwatch.hovered {
+  outline: 1px solid black;
+}
+
+fieldset, #colorPreview {
+  margin-top: 1em;
+}
+
+fieldset {
+  border: 1px solid rgb(180, 180, 180);
+}
+
+legend {
+  font-size: 80%;
 }

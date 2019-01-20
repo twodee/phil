@@ -1,6 +1,8 @@
 const sharp = require('sharp');
 const { ipcRenderer } = require('electron')
 const fsdialog = require('electron').remote.dialog;
+const Dialogs = require('dialogs');
+let dialogs = Dialogs();
 
 // Tools
 let activeToolDiv;
@@ -13,6 +15,7 @@ let history;
 // Color
 let rgbWidgets;
 let channelsRoot;
+let colorPreview;
 let colorHistoryRoot;
 let selectedColor = [0, 255, 0, 255];
 
@@ -70,7 +73,7 @@ class UndoHistory {
     let div = document.createElement('div');
     let id = this.current.id;
 
-    div.classList.add('undoEntry');
+    div.classList.add('grid3');
     div.id = `undo${id}`;
     div.innerHTML = `<input type="checkbox" class="column0" checked><span class="column1">${this.current.getLabel()}</span><span class="column2">\u2715</span>`;
     undosList.insertBefore(div, undosList.firstChild);
@@ -920,6 +923,7 @@ function onReady() {
   canvas = document.getElementById('canvas');
   undosList = document.getElementById('undosList');
   channelsRoot = document.getElementById('channelsRoot');
+  colorPreview = document.getElementById('colorPreview');
   colorHistoryRoot = document.getElementById('colorHistoryRoot');
   resizeButton = document.getElementById('resizeButton');
   resizeLeftBox = document.getElementById('resizeLeftBox');
@@ -1026,11 +1030,13 @@ function registerCallbacks() {
     header.addEventListener('click', e => {
       let headerDiv = e.target;
       headerDiv.classList.toggle('open');
-      if (headerDiv.classList.contains('open')) {
-      } else {
-      }
+      // if (headerDiv.classList.contains('open')) {
+      // } else {
+      // }
     });
   }
+
+  document.getElementById('nameColor').addEventListener('click', nameColor);
 }
 
 function activateTool(div) {
@@ -1043,11 +1049,19 @@ function activateTool(div) {
 }
 
 function rememberColor() {
-  ipcRenderer.send('add-color', selectedColor);
+  ipcRenderer.send('remember-color', selectedColor);
+}
+
+function nameColor() {
+  let name = dialogs.prompt('What name do you give this color?', name => {
+    if (name) {
+      ipcRenderer.send('name-color', name, selectedColor);
+    }
+  });
 }
 
 function syncColor() {
-  channelsRoot.style['background-color'] = `rgb(${selectedColor[0]}, ${selectedColor[1]}, ${selectedColor[2]})`;
+  colorPreview.style['background-color'] = `rgb(${selectedColor[0]}, ${selectedColor[1]}, ${selectedColor[2]})`;
 }
 
 function syncWidgetsToColor() {
@@ -1250,13 +1264,63 @@ ipcRenderer.on('update-color-history', function(event, history) {
   for (let i = history.length - 1; i >= 0; --i) {
     let color = history[i].color;
     let button = document.createElement('div');
-    button.classList.add('colorHistoryEntry');
+    button.classList.add('colorHistorySwatch');
     button.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
     button.addEventListener('click', () => {
       selectedColor = color;
       syncWidgetsToColor();
     });
     colorHistoryRoot.appendChild(button);
+  }
+});
+
+ipcRenderer.on('update-color-palette', function(event, palette) {
+  while (colorPaletteRoot.firstChild) {
+    colorPaletteRoot.removeChild(colorPaletteRoot.firstChild);
+  }
+
+  for (let i = palette.length - 1; i >= 0; --i) {
+    let {name, color} = palette[i];
+
+    let swatch = document.createElement('div');
+    swatch.classList.add('colorPaletteSwatch');
+    swatch.classList.add('column0');
+    swatch.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+
+    let label = document.createElement('span');
+    label.classList.add('column1');
+    label.innerText = name;
+
+    let deleter = document.createElement('span');
+    deleter.classList.add('column2');
+    deleter.innerText = '\u2715';
+
+    let entry = document.createElement('div');
+    entry.classList.add('colorPaletteEntry');
+    entry.classList.add('grid3');
+    entry.appendChild(swatch);
+    entry.appendChild(label);
+    entry.appendChild(deleter);
+
+    entry.addEventListener('click', () => {
+      selectedColor = color;
+      syncWidgetsToColor();
+    });
+
+    label.addEventListener('mouseenter', () => {
+      swatch.classList.add('hovered');
+    });
+
+    label.addEventListener('mouseleave', () => {
+      swatch.classList.remove('hovered');
+    });
+
+    deleter.addEventListener('click', () => {
+      console.log("remove");
+      ipcRenderer.send('unname-color', name);
+    });
+
+    colorPaletteRoot.appendChild(entry);
   }
 });
 

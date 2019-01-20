@@ -61,8 +61,17 @@
             <input type="range" class="channelSlider" id="alphaSlider" min="0" max="255">
             <input type="textbox" class="channelBox" id="alphaBox" size="3">
           </div>
-
-          <div id="colorHistoryRoot"></div>
+          <div id="colorPreview"></div>
+          <fieldset>
+            <legend>Recent colors</legend>
+            <div id="colorHistoryRoot"></div>
+          </fieldset>
+          <fieldset>
+            <legend>Palette
+              <button id="nameColor">Add</button>
+            </legend>
+            <div id="colorPaletteRoot"></div>
+          </fieldset>
         </div>
       </div>
     </div>
