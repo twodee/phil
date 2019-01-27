@@ -80,6 +80,10 @@ body {
   font-family: sans-serif;
   margin-bottom: 1em;
   user-select: none;
+  font-size: 115%;
+  color: rgb(75, 75, 120);
+  /* font-variant: small-caps; */
+  /* text-transform: uppercase; */
 }
 
 #right {
@@ -257,4 +261,12 @@ fieldset {
 
 legend {
   font-size: 80%;
+}
+
+.autoDrawOptions {
+  margin-left: 1em;
+}
+
+.autoDrawSection:not(:last-child) {
+  margin-bottom: 1em;
 }

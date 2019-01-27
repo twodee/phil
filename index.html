@@ -19,10 +19,6 @@
             <div class="tool" id="dropper"><img src="images/dropper.png"></div>
             <div class="tool" id="bucket"><img src="images/bucket.png"></div>
           </div>
-          <div id="symmetryOptions">
-            <div><label><input type="checkbox" id="verticalSymmetryBox">Vertical symmetry</label></div>
-            <div><label><input type="checkbox" id="horizontalSymmetryBox">Horizontal symmetry</label></div>
-          </div>
         </div>
       </div>
 
@@ -30,27 +26,6 @@
         <div class="panelHeader open">Information</div>
         <div class="panelBody">
           <div>Pixel position: <span id="pixelCoordinatesBox">-</span></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panelHeader">Undo</div>
-        <div class="panelBody">
-          <div id="undosList">
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panelHeader">Size</div>
-        <div class="panelBody" id="sizePanelBody">
-          <div id="resizeOffsets">
-            <input type="text" size="4" tabindex="1" placeholder="top" id="resizeTopBox">
-            <input type="text" size="4" tabindex="3" placeholder="right" id="resizeRightBox">
-            <input type="text" size="4" tabindex="4" placeholder="bottom" id="resizeBottomBox">
-            <input type="text" size="4" tabindex="2" placeholder="left" id="resizeLeftBox">
-          </div>
-          <button id="resizeButton"></button>
         </div>
       </div>
 
@@ -85,6 +60,52 @@
             </legend>
             <div id="colorPaletteRoot"></div>
           </fieldset>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panelHeader open">Autodraw</div>
+        <div class="panelBody">
+          <div class="autoDrawSection">
+            <label><input type="radio" id="autoDrawNone" name="autoDraw">None</label>
+          </div>
+          <div class="autoDrawSection">
+            <label><input type="radio" id="autoDrawRotate" name="autoDraw">Rotational mirroring</label>
+            <div id="symmetryOptions" class="autoDrawOptions">
+              <div><label><input type="checkbox" id="verticalSymmetryBox">Vertical symmetry</label></div>
+              <div><label><input type="checkbox" id="horizontalSymmetryBox">Horizontal symmetry</label></div>
+            </div>
+          </div>
+          <div class="autoDrawSection">
+            <label><input type="radio" id="autoDrawTile" name="autoDraw">Array tiling</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panelHeader">Grid</div>
+        <div class="panelBody">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panelHeader">Undo</div>
+        <div class="panelBody">
+          <div id="undosList">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panelHeader">Size</div>
+        <div class="panelBody" id="sizePanelBody">
+          <div id="resizeOffsets">
+            <input type="text" size="4" tabindex="1" placeholder="top" id="resizeTopBox">
+            <input type="text" size="4" tabindex="3" placeholder="right" id="resizeRightBox">
+            <input type="text" size="4" tabindex="4" placeholder="bottom" id="resizeBottomBox">
+            <input type="text" size="4" tabindex="2" placeholder="left" id="resizeLeftBox">
+          </div>
+          <button id="resizeButton"></button>
         </div>
       </div>
     </div>
