@@ -7,6 +7,8 @@ let dialogs = Dialogs();
 // Tools
 let activeToolDiv;
 let tools = {};
+let isVerticallySymmetric;
+let isHorizontallySymmetric;
 
 // Undos
 let undosList;
@@ -802,11 +804,35 @@ function mouseToPixels(mouseX, mouseY) {
   return positionPixels;
 }
 
+function setPixelToCurrentColor(p) {
+  history.current.add(p.x, p.y, selectedColor.slice(0));
+  image.set(p.x, p.y, selectedColor);
+  imageTexture.uploadPixel(p.x, p.y);
+}
+
 function drawPixel(p) {
-  if (p.x >= 0 && p.x < image.width && p.y >= 0 && p.y < image.height) {
-    history.current.add(p.x, p.y, selectedColor.slice(0));
-    image.set(p.x, p.y, selectedColor);
-    imageTexture.uploadPixel(p.x, p.y);
+  if (image.containsPixel(p)) {
+    setPixelToCurrentColor(p);
+
+    let midX = Math.floor(image.width / 2);
+    let midY = Math.floor(image.height / 2);
+    
+    let horizontallyFlipped = new Vector2(midX - (p.x - midX), p.y);
+    let verticallyFlipped = new Vector2(p.x, midY - (p.y - midY));
+    let bothFlipped = new Vector2(horizontallyFlipped.x, verticallyFlipped.y);
+
+    if (isHorizontallySymmetric && image.containsPixel(horizontallyFlipped)) {
+      setPixelToCurrentColor(horizontallyFlipped);
+    }
+
+    if (isVerticallySymmetric && image.containsPixel(verticallyFlipped)) {
+      setPixelToCurrentColor(verticallyFlipped);
+    }
+
+    if (isVerticallySymmetric && isHorizontallySymmetric && image.containsPixel(bothFlipped)) {
+      setPixelToCurrentColor(bothFlipped);
+    }
+
     rememberColor();
   }
 }
@@ -934,6 +960,9 @@ function onReady() {
   gl = canvas.getContext('webgl2');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
+  isHorizontallySymmetric = false;
+  isVerticallySymmetric = false;
+
   createBackground();
   createImage();
   render();
@@ -1030,13 +1059,21 @@ function registerCallbacks() {
     header.addEventListener('click', e => {
       let headerDiv = e.target;
       headerDiv.classList.toggle('open');
-      // if (headerDiv.classList.contains('open')) {
-      // } else {
-      // }
     });
   }
 
   document.getElementById('nameColor').addEventListener('click', nameColor);
+
+  let verticalSymmetryBox = document.getElementById('verticalSymmetryBox');
+  let horizontalSymmetryBox = document.getElementById('horizontalSymmetryBox');
+
+  verticalSymmetryBox.addEventListener('change', e => {
+    isVerticallySymmetric = verticalSymmetryBox.checked;
+  });
+
+  horizontalSymmetryBox.addEventListener('change', e => {
+    isHorizontallySymmetric = horizontalSymmetryBox.checked;
+  });
 }
 
 function activateTool(div) {
