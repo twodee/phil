@@ -9,6 +9,7 @@ let activeToolDiv;
 let tools = {};
 let isVerticallySymmetric;
 let isHorizontallySymmetric;
+let pixelCoordinatesBox;
 
 // Undos
 let undosList;
@@ -52,6 +53,8 @@ let inverseProjection;
 let imagePath;
 let image;
 let mouseAt;
+
+let isShift;
 
 class UndoHistory {
   constructor(image) {
@@ -395,6 +398,28 @@ class Image {
       while (cc < this.width && this.isPixel(cc, rr, oldColor)) {
         this.set(cc, rr, newColor);
         history.current.add(cc, rr, newColor.slice(0));
+
+        let midX = Math.floor(this.width / 2);
+        let midY = Math.floor(this.height / 2);
+        
+        let horizontallyFlipped = new Vector2(midX - (cc - midX), rr);
+        let verticallyFlipped = new Vector2(cc, midY - (rr - midY));
+        let bothFlipped = new Vector2(horizontallyFlipped.x, verticallyFlipped.y);
+
+        if (isHorizontallySymmetric && this.containsPixel(horizontallyFlipped)) {
+          this.set(horizontallyFlipped.x, horizontallyFlipped.y, newColor);
+          history.current.add(horizontallyFlipped.x, horizontallyFlipped.y, newColor.slice(0));
+        }
+
+        if (isVerticallySymmetric && this.containsPixel(verticallyFlipped)) {
+          this.set(verticallyFlipped.x, verticallyFlipped.y, newColor);
+          history.current.add(verticallyFlipped.x, verticallyFlipped.y, newColor.slice(0));
+        }
+
+        if (isVerticallySymmetric && isHorizontallySymmetric && this.containsPixel(bothFlipped)) {
+          this.set(bothFlipped.x, bothFlipped.y, newColor);
+          history.current.add(bothFlipped.x, bothFlipped.y, newColor.slice(0));
+        }
 
         if (!spanAbove && rr > 0 && this.isPixel(cc, rr - 1, oldColor)) {
           stack.push([cc, rr - 1]);
@@ -890,9 +915,14 @@ function onMouseUp(e) {
 }
 
 function onMouseMove(e) {
-  if (!image) return;
+  if (!image) {
+    pixelCoordinatesBox.innerText = `-`;
+    return;
+  }
 
   let newMouseAt = mouseToPixels(e.clientX, e.clientY);
+
+  pixelCoordinatesBox.innerText = `${newMouseAt.x}, ${newMouseAt.y}`;
 
   if (lockAxis == null && mouseAt && !newMouseAt.equals(mouseAt) && e.shiftKey) {
     let diff = newMouseAt.subtract(mouseAt).abs();
@@ -956,12 +986,14 @@ function onReady() {
   resizeRightBox = document.getElementById('resizeRightBox');
   resizeTopBox = document.getElementById('resizeTopBox');
   resizeBottomBox = document.getElementById('resizeBottomBox');
+  pixelCoordinatesBox = document.getElementById('pixelCoordinatesBox');
 
   gl = canvas.getContext('webgl2');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
   isHorizontallySymmetric = false;
   isVerticallySymmetric = false;
+  isShift = false;
 
   createBackground();
   createImage();
@@ -1013,12 +1045,15 @@ function registerCallbacks() {
   window.addEventListener('mouseup', onMouseUp);
 
   window.addEventListener('keydown', e => {
+    isShift = false;
     if (e.key == 'p') {
       activateTool(tools.pencil);
     } else if (e.key == 'e') {
       activateTool(tools.dropper);
     } else if (e.key == 'b') {
       activateTool(tools.bucket);
+    } else if (e.key == 'Shift') {
+      isShift = true;
     }
   });
   
@@ -1114,10 +1149,20 @@ function initializeChannelWidgets(i, slider, box) {
   box.value = selectedColor[i];
   slider.value = selectedColor[i];
 
-  slider.addEventListener('input', () => {
+  slider.addEventListener('input', e => {
     selectedColor[i] = parseInt(slider.value);
     box.value = selectedColor[i];
+
+    if (i < 3 && isShift) {
+      selectedColor[(i + 1) % 3] = selectedColor[i];
+      selectedColor[(i + 2) % 3] = selectedColor[i];
+    }
+
     syncColor();
+
+    if (i < 3 && isShift) {
+      syncWidgetsToColor();
+    }
   });
 
   box.addEventListener('input', () => {

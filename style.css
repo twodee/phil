@@ -2,7 +2,7 @@
   box-sizing: border-box;
 }
 
-span, legend, label {
+span, legend, label, div.panel {
   font-family: sans-serif;
 }
 
