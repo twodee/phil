@@ -46,15 +46,20 @@ let backgroundTextureUniform;
 let imageTextureUniform;
 let resolutionUniform;
 let projectionUniform;
+let modelviewUniform;
 
 let projection;
 let inverseProjection;
 
 let imagePath;
 let image;
-let mouseAt;
+let mouseScreen;
+let mouseImage;
 
 let isShift;
+
+let modelview;
+let scale;
 
 class UndoHistory {
   constructor(image) {
@@ -242,7 +247,7 @@ class UndoableImage extends Undoable {
 
   setPixelsToLatest(history) {
     let size = history.getMostRecentSize();
-    image.resize(size[0], size[1]);
+    image.resize(size.x, size.y);
 
     for (let r = 0; r < image.height; ++r) {
       for (let c = 0; c < image.width; ++c) {
@@ -314,7 +319,7 @@ class UndoablePixels extends Undoable {
 
 class Image {
   constructor(width, height, nchannels, pixels) {
-    this.size = [width, height];
+    this.size = new Vector2(width, height);
     this.nchannels = nchannels;
     this.bytes = pixels;
   }
@@ -332,7 +337,7 @@ class Image {
   }
 
   set(c, r, rgb) {
-    var start = (r * this.width + c) * 4;
+    let start = (r * this.width + c) * 4;
     this.bytes[start + 0] = rgb[0];
     this.bytes[start + 1] = rgb[1];
     this.bytes[start + 2] = rgb[2];
@@ -451,19 +456,19 @@ class Image {
   }
 
   get width() {
-    return this.size[0];
+    return this.size.x;
   }
 
   get height() {
-    return this.size[1];
+    return this.size.y;
   }
 
   set width(value) {
-    this.size[0] = value;
+    this.size.x = value;
   }
 
   set height(value) {
-    this.size[1] = value;
+    this.size.y = value;
   }
 
   extract(t, r, b, l) {
@@ -504,7 +509,6 @@ class Image {
     this.width = newWidth;
     this.height = newHeight;
     this.bytes = newBytes;
-    console.log("this.size:", this.size);
   }
 
   resize(newWidth, newHeight) {
@@ -584,6 +588,18 @@ class Vector2 {
     return new Vector2(Math.round(this.x), Math.round(this.y));
   }
 
+  multiplyScalar(factor) {
+    return new Vector2(factor * this.x, factor * this.y);
+  }
+
+  multiplyVector(that) {
+    return new Vector2(this.x * that.x, this.y * that.y);
+  }
+
+  divideVector(that) {
+    return new Vector2(this.x / that.x, this.y / that.y);
+  }
+
   maxValue() {
     return Math.max(this.x, this.y);
   }
@@ -638,18 +654,91 @@ class Matrix4 {
     return this.floats;
   }
 
-  multiply(v) {
-    var product = [0, 0, 0, 0];
-    for (var r = 0; r < 4; ++r) {
-      for (var c = 0; c < 4; ++c) {
+  multiplyMatrix(that) {
+    let product = new Matrix4()
+    for (let r = 0; r < 4; ++r) {
+      for (let c = 0; c < 4; ++c) {
+        let dot = 0;
+        for (let i = 0; i < 4; ++i) {
+          dot += this.get(r, i) * that.get(i, c);
+        }
+        product.set(r, c, dot);
+      }
+    }
+    return product;
+  }
+
+  multiplyVector(v) {
+    let product = [0, 0, 0, 0];
+    for (let r = 0; r < 4; ++r) {
+      for (let c = 0; c < 4; ++c) {
         product[r] += this.get(r, c) * v[c];
       }
     }
     return product;
   }
 
+  inverse() {
+    let m = new Matrix4();
+
+    let a0 = this.get(0, 0) * this.get(1, 1) - this.get(0, 1) * this.get(1, 0);
+    let a1 = this.get(0, 0) * this.get(1, 2) - this.get(0, 2) * this.get(1, 0);
+    let a2 = this.get(0, 0) * this.get(1, 3) - this.get(0, 3) * this.get(1, 0);
+
+    let a3 = this.get(0, 1) * this.get(1, 2) - this.get(0, 2) * this.get(1, 1);
+    let a4 = this.get(0, 1) * this.get(1, 3) - this.get(0, 3) * this.get(1, 1);
+    let a5 = this.get(0, 2) * this.get(1, 3) - this.get(0, 3) * this.get(1, 2);
+
+    let b0 = this.get(2, 0) * this.get(3, 1) - this.get(2, 1) * this.get(3, 0);
+    let b1 = this.get(2, 0) * this.get(3, 2) - this.get(2, 2) * this.get(3, 0);
+    let b2 = this.get(2, 0) * this.get(3, 3) - this.get(2, 3) * this.get(3, 0);
+
+    let b3 = this.get(2, 1) * this.get(3, 2) - this.get(2, 2) * this.get(3, 1);
+    let b4 = this.get(2, 1) * this.get(3, 3) - this.get(2, 3) * this.get(3, 1);
+    let b5 = this.get(2, 2) * this.get(3, 3) - this.get(2, 3) * this.get(3, 2);
+
+    let determinant = a0 * b5 - a1 * b4 + a2 * b3 + a3 * b2 - a4 * b1 + a5 * b0;
+
+    if (determinant != 0) {
+      let inverseDeterminant = 1 / determinant;
+      m.set(0, 0, (+this.get(1, 1) * b5 - this.get(1, 2) * b4 + this.get(1, 3) * b3) * inverseDeterminant);
+      m.set(0, 1, (-this.get(0, 1) * b5 + this.get(0, 2) * b4 - this.get(0, 3) * b3) * inverseDeterminant);
+      m.set(0, 2, (+this.get(3, 1) * a5 - this.get(3, 2) * a4 + this.get(3, 3) * a3) * inverseDeterminant);
+      m.set(0, 3, (-this.get(2, 1) * a5 + this.get(2, 2) * a4 - this.get(2, 3) * a3) * inverseDeterminant);
+      m.set(1, 0, (-this.get(1, 0) * b5 + this.get(1, 2) * b2 - this.get(1, 3) * b1) * inverseDeterminant);
+      m.set(1, 1, (+this.get(0, 0) * b5 - this.get(0, 2) * b2 + this.get(0, 3) * b1) * inverseDeterminant);
+      m.set(1, 2, (-this.get(3, 0) * a5 + this.get(3, 2) * a2 - this.get(3, 3) * a1) * inverseDeterminant);
+      m.set(1, 3, (+this.get(2, 0) * a5 - this.get(2, 2) * a2 + this.get(2, 3) * a1) * inverseDeterminant);
+      m.set(2, 0, (+this.get(1, 0) * b4 - this.get(1, 1) * b2 + this.get(1, 3) * b0) * inverseDeterminant);
+      m.set(2, 1, (-this.get(0, 0) * b4 + this.get(0, 1) * b2 - this.get(0, 3) * b0) * inverseDeterminant);
+      m.set(2, 2, (+this.get(3, 0) * a4 - this.get(3, 1) * a2 + this.get(3, 3) * a0) * inverseDeterminant);
+      m.set(2, 3, (-this.get(2, 0) * a4 + this.get(2, 1) * a2 - this.get(2, 3) * a0) * inverseDeterminant);
+      m.set(3, 0, (-this.get(1, 0) * b3 + this.get(1, 1) * b1 - this.get(1, 2) * b0) * inverseDeterminant);
+      m.set(3, 1, (+this.get(0, 0) * b3 - this.get(0, 1) * b1 + this.get(0, 2) * b0) * inverseDeterminant);
+      m.set(3, 2, (-this.get(3, 0) * a3 + this.get(3, 1) * a1 - this.get(3, 2) * a0) * inverseDeterminant);
+      m.set(3, 3, (+this.get(2, 0) * a3 - this.get(2, 1) * a1 + this.get(2, 2) * a0) * inverseDeterminant);
+    } else {
+      throw 'singularity';
+    }
+
+    return m;
+  }
+
+  toString() {
+    let s = '';
+    for (let r = 0; r < 4; ++r) {
+      for (let c = 0; c < 4; ++c) {
+        s += this.get(r, c) + ', ';
+      }
+      s += '\n';
+    }
+    return s;
+  }
+
   static ortho(left, right, bottom, top, near = -1, far = 1) {
-    var m = new Matrix4();
+    console.log("bottom:", bottom);
+    console.log("top:", top);
+    let m = new Matrix4();
     m.set(0, 0, 2 / (right - left));
     m.set(1, 1, 2 / (top - bottom));
     m.set(2, 2, 2 / (near - far));
@@ -660,7 +749,7 @@ class Matrix4 {
   }
 
   static inverseOrtho(left, right, bottom, top, near = -1, far = 1) {
-    var m = Matrix4.scale((right - left) * 0.5, (top - bottom) * 0.5, (near - far) * 0.5);
+    let m = Matrix4.scale((right - left) * 0.5, (top - bottom) * 0.5, (near - far) * 0.5);
     m.set(0, 3, (right + left) * 0.5);
     m.set(1, 3, (top + bottom) * 0.5);
     m.set(2, 3, (far + near) * 0.5);
@@ -668,10 +757,18 @@ class Matrix4 {
   }
 
   static scale(x, y, z) {
-    var m = new Matrix4();
+    let m = new Matrix4();
     m.set(0, 0, x);
     m.set(1, 1, y);
     m.set(2, 2, z);
+    return m;
+  }
+
+  static translate(x, y, z) {
+    let m = new Matrix4();
+    m.set(0, 3, x);
+    m.set(1, 3, y);
+    m.set(2, 3, z);
     return m;
   }
 }
@@ -744,13 +841,16 @@ void main() {
 function createImage() {
   let vertexSource = `#version 300 es
 uniform mat4 projection;
+uniform mat4 modelview;
 in vec4 position;
 in vec2 texCoords;
 out vec2 fTexCoords;
+// out vec2 boo;
 
 void main() {
-  gl_Position = projection * position;
+  gl_Position = projection * modelview * position;
   fTexCoords = texCoords;
+  // boo = position.xy;
 }
   `;
 
@@ -758,12 +858,14 @@ void main() {
 precision mediump float;
 uniform sampler2D imageTexture;
 in vec2 fTexCoords;
+// in vec2 boo;
 out vec4 fragmentColor;
 
 void main() {
   // fragmentColor = vec4(fTexCoords, 0.0, 1.0);
   vec4 rgba = texture(imageTexture, fTexCoords);
   fragmentColor = rgba;
+  // fragmentColor = vec4(boo * 0.5 + 0.5, 0.0, 1.0);
 }
   `; 
 
@@ -779,10 +881,10 @@ void main() {
     scale, -scale, 0.0, 1.0,
     1.0, 1.0,
 
-    -scale,  scale, 0.0, 1.0,
+    -scale, scale, 0.0, 1.0,
     0.0, 0.0,
 
-    scale,  scale, 0.0, 1.0,
+    scale, scale, 0.0, 1.0,
     1.0, 0.0,
   ];
 
@@ -803,30 +905,33 @@ void main() {
 
   imageTextureUniform = gl.getUniformLocation(imageProgram, 'imageTexture');
   projectionUniform = gl.getUniformLocation(imageProgram, 'projection');
+  modelviewUniform = gl.getUniformLocation(imageProgram, 'modelview');
 
   gl.useProgram(imageProgram);
   gl.uniform1i(imageTextureUniform, 1);
   gl.useProgram(null);
 }
 
-function mouseToPixels(mouseX, mouseY) {
-  var positionMouse = [mouseX, mouseY];
+function screenToImage(screenX, screenY) {
+  let positionScreen = [screenX, screenY];
 
-  var positionClip = [
-    positionMouse[0] / gl.canvas.width * 2 - 1,
-    positionMouse[1] / gl.canvas.height * 2 - 1,
+  // Normalize the screen coordinates to [-1, 1] space.
+  let positionNormalized = [
+    positionScreen[0] / gl.canvas.width * 2 - 1,
+    positionScreen[1] / gl.canvas.height * 2 - 1,
     0,
     1
   ];
 
-  var positionTexture = inverseProjection.multiply(positionClip);
 
-  var positionPixels = new Vector2(
-    Math.floor((positionTexture[0] * 0.5 + 0.5) * image.width),
-    Math.floor((positionTexture[1] * 0.5 + 0.5) * image.height)
+  let positionClip = inverseProjection.multiplyVector(positionNormalized);
+  let positionObject = modelview.inverse().multiplyVector(positionClip);
+  let positionImage = new Vector2(
+    Math.floor((positionObject[0] * 0.5 + 0.5) * image.width),
+    image.height - 1 - Math.floor((positionObject[1] * 0.5 + 0.5) * image.height)
   );
 
-  return positionPixels;
+  return positionImage;
 }
 
 function setPixelToCurrentColor(p) {
@@ -872,19 +977,22 @@ function drawLine(from, to) {
 }
 
 function onMouseDown(e) {
-  mouseAt = mouseToPixels(e.clientX, e.clientY);
+  mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
+  mouseImage = screenToImage(mouseScreen.x, mouseScreen.y);
 
-  if (activeToolDiv == tools.pencil) {
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, imageTexture.textureId);
-    history.begin(new UndoablePixels());
-    drawPixel(mouseAt);
-    render();
-  }
-  
-  else if (activeToolDiv == tools.dropper) {
-    if (isOverImage(mouseAt)) {
-      selectColor(image.get(mouseAt.x, mouseAt.y));
+  if (e.which == 1) {
+    if (activeToolDiv == tools.pencil) {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, imageTexture.textureId);
+      history.begin(new UndoablePixels());
+      drawPixel(mouseImage);
+      render();
+    }
+    
+    else if (activeToolDiv == tools.dropper) {
+      if (isOverImage(mouseImage)) {
+        selectColor(image.get(mouseImage.x, mouseImage.y));
+      }
     }
   }
 }
@@ -900,10 +1008,12 @@ function selectColor(rgba) {
 
 function onMouseUp(e) {
   if (activeToolDiv == tools.bucket) {
-    let newMouseAt = mouseToPixels(e.clientX, e.clientY);
-    if (isOverImage(newMouseAt)) {
+    mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
+    mouseImage = screenToImage(mouseScreen.x, mouseScreen.y);
+
+    if (isOverImage(mouseImage)) {
       history.begin(new UndoablePixels());
-      image.fill(newMouseAt.x, newMouseAt.y, selectedColor, e.shiftKey);
+      image.fill(mouseImage.x, mouseImage.y, selectedColor, e.shiftKey);
       imageTexture.upload();
       rememberColor();
       render();
@@ -920,12 +1030,12 @@ function onMouseMove(e) {
     return;
   }
 
-  let newMouseAt = mouseToPixels(e.clientX, e.clientY);
+  let newMouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
+  let newMouseImage = screenToImage(newMouseScreen.x, newMouseScreen.y);
+  pixelCoordinatesBox.innerText = `${newMouseImage.x}, ${newMouseImage.y}`;
 
-  pixelCoordinatesBox.innerText = `${newMouseAt.x}, ${newMouseAt.y}`;
-
-  if (lockAxis == null && mouseAt && !newMouseAt.equals(mouseAt) && e.shiftKey) {
-    let diff = newMouseAt.subtract(mouseAt).abs();
+  if (lockAxis == null && mouseScreen && !newMouseScreen.equals(mouseScreen) && e.shiftKey) {
+    let diff = newMouseScreen.subtract(mouseScreen).abs();
     if (diff.x > diff.y) {
       lockAxis = 1;
     } else {
@@ -934,29 +1044,37 @@ function onMouseMove(e) {
   }
 
   if (lockAxis == 0) {
-    newMouseAt.x = mouseAt.x;
+    newMouseScreen.x = mouseScreen.x;
   } else if (lockAxis == 1) {
-    newMouseAt.y = mouseAt.y;
+    newMouseScreen.y = mouseScreen.y;
   }
 
-  syncCursor(newMouseAt);
+  syncCursor(newMouseImage);
 
-  if (activeToolDiv == tools.pencil) {
-    if (e.buttons == 1) {
+  if (e.which == 1) {
+    if (activeToolDiv == tools.pencil) {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, imageTexture.textureId);
-      drawLine(mouseAt, newMouseAt);
+      drawLine(mouseImage, newMouseImage);
       render();
-      mouseAt = newMouseAt;
     }
+
+    else if (activeToolDiv == tools.dropper) {
+      if (isOverImage(mouseScreen)) {
+        selectColor(image.get(newMouseImage.x, newMouseImage.y));
+      }
+    }
+  } else if (e.which == 3) {
+    let diff = newMouseScreen.subtract(mouseScreen);
+    let aspectRatio = canvas.width / canvas.height;
+    let constraints = aspectRatio >= 1 ? new Vector2(2 * aspectRatio, 2) : new Vector2(2, 2 / aspectRatio);
+    diff = diff.divideVector(new Vector2(canvas.width, canvas.height)).multiplyVector(constraints);
+    modelview = Matrix4.translate(diff.x, diff.y, 0).multiplyMatrix(modelview);
+    render();
   }
 
-  else if (activeToolDiv == tools.dropper) {
-    mouseAt = newMouseAt;
-    if (e.buttons == 1 && isOverImage(mouseAt)) {
-      selectColor(image.get(mouseAt.x, mouseAt.y));
-    }
-  }
+  mouseScreen = newMouseScreen;
+  mouseImage = newMouseImage;
 }
 
 function syncCursor(mousePosition) {
@@ -975,6 +1093,16 @@ function syncCursor(mousePosition) {
   }
 }
 
+function onMouseWheel(e) {
+  let factor = 1 - e.deltaY / 100;
+  if (scale * factor > 0.1) {
+    scale *= factor;
+  } else {
+    modelview = Matrix4.scale(factor, factor, 1).multiplyMatrix(modelview);
+  }
+  render();
+}
+
 function onReady() {
   canvas = document.getElementById('canvas');
   undosList = document.getElementById('undosList');
@@ -991,6 +1119,7 @@ function onReady() {
   gl = canvas.getContext('webgl2');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
+  modelview = new Matrix4();
   isHorizontallySymmetric = false;
   isVerticallySymmetric = false;
   isShift = false;
@@ -1034,7 +1163,7 @@ function registerCallbacks() {
   tools.bucket = document.getElementById('bucket');
 
   activateTool(tools.pencil);
-  for (var tool in tools) {
+  for (let tool in tools) {
     tools[tool].addEventListener('click', e => {
       activateTool(e.srcElement);
     });
@@ -1042,10 +1171,10 @@ function registerCallbacks() {
 
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('wheel', onMouseWheel);
   window.addEventListener('mouseup', onMouseUp);
 
   window.addEventListener('keydown', e => {
-    isShift = false;
     if (e.key == 'p') {
       activateTool(tools.pencil);
     } else if (e.key == 'e') {
@@ -1054,6 +1183,12 @@ function registerCallbacks() {
       activateTool(tools.bucket);
     } else if (e.key == 'Shift') {
       isShift = true;
+    }
+  });
+
+  window.addEventListener('keyup', e => {
+    if (e.key == 'Shift') {
+      isShift = false;
     }
   });
   
@@ -1117,7 +1252,7 @@ function activateTool(div) {
   }
   activeToolDiv = div;
   activeToolDiv.classList.add('active');
-  syncCursor(mouseAt);
+  syncCursor(mouseImage);
 }
 
 function rememberColor() {
@@ -1200,6 +1335,7 @@ function render() {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(imageProgram);
     gl.uniformMatrix4fv(projectionUniform, false, projection.toBuffer());
+    gl.uniformMatrix4fv(modelviewUniform, false, modelview.toBuffer());
     gl.bindVertexArray(imageVao);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
@@ -1255,6 +1391,9 @@ function updateProjection() {
     projection = Matrix4.ortho(-1 * windowAspect / imageAspect, 1 * windowAspect / imageAspect, -1, 1);
     inverseProjection = Matrix4.inverseOrtho(-1 * windowAspect / imageAspect, 1 * windowAspect / imageAspect, -1, 1);
   }
+
+  let r = projection.multiplyVector([1, 1, 0, 1]);
+  console.log("r.toString():", r.toString());
 }
 
 function loadImage(path, width, height, nchannels, pixels) {
@@ -1398,7 +1537,6 @@ ipcRenderer.on('update-color-palette', function(event, palette) {
     });
 
     deleter.addEventListener('click', () => {
-      console.log("remove");
       ipcRenderer.send('unname-color', name);
     });
 
