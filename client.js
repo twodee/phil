@@ -4,12 +4,29 @@ const fsdialog = require('electron').remote.dialog;
 const Dialogs = require('dialogs');
 let dialogs = Dialogs();
 
+class DrawingMode {
+}
+DrawingMode.None = 0;
+DrawingMode.RotationalMirroring = 1;
+DrawingMode.ArrayTiling = 2;
+
+// Lines
+let linesProgram;
+let linesProjectionUniform;
+let linesModelviewUniform;
+
+// Rotational Mirroring
+let rotationalMirroringAxesVao;
+let wedgeCount = 2;
+let rotationOffset = 0;
+
 // Tools
 let activeToolDiv;
 let tools = {};
 let isVerticallySymmetric;
 let isHorizontallySymmetric;
 let pixelCoordinatesBox;
+let drawingMode = DrawingMode.None;
 
 // Undos
 let undosList;
@@ -736,8 +753,6 @@ class Matrix4 {
   }
 
   static ortho(left, right, bottom, top, near = -1, far = 1) {
-    console.log("bottom:", bottom);
-    console.log("top:", top);
     let m = new Matrix4();
     m.set(0, 0, 2 / (right - left));
     m.set(1, 1, 2 / (top - bottom));
@@ -838,6 +853,56 @@ void main() {
   gl.useProgram(null);
 }
 
+function createLinesProgram() {
+  let vertexSource = `#version 300 es
+uniform mat4 projection;
+uniform mat4 modelview;
+in vec4 position;
+
+void main() {
+  gl_Position = projection * modelview * position;
+}
+  `;
+
+  let fragmentSource = `#version 300 es
+precision mediump float;
+out vec4 fragmentColor;
+
+void main() {
+  fragmentColor = vec4(1.0);
+}
+  `; 
+
+  let vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
+  let fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
+  linesProgram = linkProgram(vertexShader, fragmentShader);
+
+  linesProjectionUniform = gl.getUniformLocation(linesProgram, 'projection');
+  linesModelviewUniform = gl.getUniformLocation(linesProgram, 'modelview');
+}
+
+function createRotationalMirroringAxes() {
+  let vertices = [
+    0.0, 0.0, 0.0, 1.0,
+    0.0, 1.0, 0.0, 1.0,
+    0.0, 0.0, 0.0, 1.0,
+    1.0, 0.0, 0.0, 1.0,
+  ];
+
+  rotationalMirroringAxesVao = gl.createVertexArray();
+  gl.bindVertexArray(rotationalMirroringAxesVao);
+
+  let vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(positionAttributeLocation);
+
+  console.log("hi");
+}
+
 function createImage() {
   let vertexSource = `#version 300 es
 uniform mat4 projection;
@@ -845,12 +910,10 @@ uniform mat4 modelview;
 in vec4 position;
 in vec2 texCoords;
 out vec2 fTexCoords;
-// out vec2 boo;
 
 void main() {
   gl_Position = projection * modelview * position;
   fTexCoords = texCoords;
-  // boo = position.xy;
 }
   `;
 
@@ -858,7 +921,6 @@ void main() {
 precision mediump float;
 uniform sampler2D imageTexture;
 in vec2 fTexCoords;
-// in vec2 boo;
 out vec4 fragmentColor;
 
 void main() {
@@ -1126,6 +1188,8 @@ function onReady() {
 
   createBackground();
   createImage();
+  createLinesProgram();
+  createRotationalMirroringAxes();
   render();
 
   registerCallbacks();
@@ -1234,16 +1298,37 @@ function registerCallbacks() {
 
   document.getElementById('nameColor').addEventListener('click', nameColor);
 
-  let verticalSymmetryBox = document.getElementById('verticalSymmetryBox');
-  let horizontalSymmetryBox = document.getElementById('horizontalSymmetryBox');
-
-  verticalSymmetryBox.addEventListener('change', e => {
-    isVerticallySymmetric = verticalSymmetryBox.checked;
+  let autoDrawNoneButton = document.getElementById('autoDrawNoneButton');
+  autoDrawNoneButton.addEventListener('click', () => {
+    drawingMode = DrawingMode.None; 
   });
 
-  horizontalSymmetryBox.addEventListener('change', e => {
-    isHorizontallySymmetric = horizontalSymmetryBox.checked;
+  let autoDrawRotationalMirroringButton = document.getElementById('autoDrawRotationalMirroringButton');
+  autoDrawRotationalMirroringButton.addEventListener('click', () => {
+    drawingMode = DrawingMode.RotationalMirroring; 
   });
+
+  let autoDrawArrayTilingButton = document.getElementById('autoDrawArrayTilingButton');
+  autoDrawArrayTilingButton.addEventListener('click', () => {
+    drawingMode = DrawingMode.ArrayTiling; 
+  });
+
+  let wedgeCountBox = document.getElementById('wedgeCountBox');
+  wedgeCountBox.addEventListener('input', e => {
+    wedgeCount = parseInt(wedgeCountBox.value);
+    updateRotationalMirroringAxes();
+  });
+
+  let rotationOffsetBox = document.getElementById('rotationOffsetBox');
+  rotationOffsetBox.addEventListener('input', e => {
+    rotationOffset = parseFloat(rotationOffsetBox.value);
+    updateRotationalMirroringAxes();
+  });
+}
+
+function updateRotationalMirroringAxes() {
+  console.log("wedgeCount:", wedgeCount);
+  console.log("rotationOffset:", rotationOffset);
 }
 
 function activateTool(div) {
@@ -1340,6 +1425,14 @@ function render() {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
     gl.useProgram(null);
+
+    gl.useProgram(linesProgram);
+    gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
+    gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
+    gl.bindVertexArray(rotationalMirroringAxesVao);
+    gl.drawArrays(gl.LINES, 0, 4);
+    gl.bindVertexArray(null);
+    gl.useProgram(null);
   }
 }
 
@@ -1391,9 +1484,6 @@ function updateProjection() {
     projection = Matrix4.ortho(-1 * windowAspect / imageAspect, 1 * windowAspect / imageAspect, -1, 1);
     inverseProjection = Matrix4.inverseOrtho(-1 * windowAspect / imageAspect, 1 * windowAspect / imageAspect, -1, 1);
   }
-
-  let r = projection.multiplyVector([1, 1, 0, 1]);
-  console.log("r.toString():", r.toString());
 }
 
 function loadImage(path, width, height, nchannels, pixels) {

@@ -114,6 +114,15 @@ body {
 .channelBox {
 }
 
+#rotationalMirroringRoot {
+  margin-top: 1em;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-column-gap: 5px;
+  grid-row-gap: 5px;
+}
+
+
 .tool {
   display: inline-block;
   font-size: 24px;
@@ -264,7 +273,7 @@ legend {
 }
 
 .autoDrawOptions {
-  margin-left: 1em;
+  margin-left: 1.5em;
 }
 
 .autoDrawSection:not(:last-child) {
