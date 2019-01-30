@@ -73,13 +73,19 @@
             <label><input type="radio" id="autoDrawRotationalMirroringButton" name="autoDraw">Rotational mirroring</label>
             <div id="rotationalMirroringRoot" class="autoDrawOptions">
               <span>Wedge count</span>
-              <input type="number" value="2" min="2" size="3" id="wedgeCountBox">
+              <input type="number" value="2" min="2" id="wedgeCountBox">
               <span>Rotation offset</span>
-              <input type="text" value="0" id="rotationOffsetBox">
+              <input type="number" value="0" min="-359" max="359" step="any" id="rotationOffsetBox">
             </div>
           </div>
           <div class="autoDrawSection">
             <label><input type="radio" id="autoDrawArrayTilingButton" name="autoDraw">Array tiling</label>
+            <div id="arrayTilingRoot" class="autoDrawOptions">
+              <span>Tile width</span>
+              <input type="number" value="32" min="1" id="tileWidthBox">
+              <span>Tile height</span>
+              <input type="number" value="32" min="1" id="tileHeightBox">
+            </div>
           </div>
         </div>
       </div>

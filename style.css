@@ -115,13 +115,18 @@ body {
 }
 
 #rotationalMirroringRoot {
-  margin-top: 1em;
   display: grid;
   grid-template-columns: auto auto;
   grid-column-gap: 5px;
   grid-row-gap: 5px;
 }
 
+#arrayTilingRoot {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-column-gap: 5px;
+  grid-row-gap: 5px;
+}
 
 .tool {
   display: inline-block;
@@ -274,6 +279,7 @@ legend {
 
 .autoDrawOptions {
   margin-left: 1.5em;
+  margin-top: 0.5em;
 }
 
 .autoDrawSection:not(:last-child) {

@@ -15,18 +15,32 @@ let linesProgram;
 let linesProjectionUniform;
 let linesModelviewUniform;
 
-// Rotational Mirroring
+// Rotational mirroring
 let rotationalMirroringAxesVao;
-let wedgeCount = 2;
-let rotationOffset = 0;
+let rotationalMirroringAxesVbo;
+let wedgeCount;
+let rotationOffset;
+
+// Array tiling
+let tileSize;
+let arrayTilingGridVao;
+let arrayTilingGridVbo;
+let arrayTilingLineCount;
+
+// Autodrawing widgets
+let autoDrawNoneButton;
+let autoDrawRotationalMirroringButton;
+let autoDrawArrayTilingButton;
+let wedgeCountBox;
+let rotationOffsetBox;
+let tileWidthBox;
+let tileHeightBox;
 
 // Tools
 let activeToolDiv;
 let tools = {};
-let isVerticallySymmetric;
-let isHorizontallySymmetric;
 let pixelCoordinatesBox;
-let drawingMode = DrawingMode.None;
+let drawingMode;
 
 // Undos
 let undosList;
@@ -433,15 +447,15 @@ class Image {
           history.current.add(horizontallyFlipped.x, horizontallyFlipped.y, newColor.slice(0));
         }
 
-        if (isVerticallySymmetric && this.containsPixel(verticallyFlipped)) {
-          this.set(verticallyFlipped.x, verticallyFlipped.y, newColor);
-          history.current.add(verticallyFlipped.x, verticallyFlipped.y, newColor.slice(0));
-        }
+        // if (isVerticallySymmetric && this.containsPixel(verticallyFlipped)) {
+          // this.set(verticallyFlipped.x, verticallyFlipped.y, newColor);
+          // history.current.add(verticallyFlipped.x, verticallyFlipped.y, newColor.slice(0));
+        // }
 
-        if (isVerticallySymmetric && isHorizontallySymmetric && this.containsPixel(bothFlipped)) {
-          this.set(bothFlipped.x, bothFlipped.y, newColor);
-          history.current.add(bothFlipped.x, bothFlipped.y, newColor.slice(0));
-        }
+        // if (isVerticallySymmetric && isHorizontallySymmetric && this.containsPixel(bothFlipped)) {
+          // this.set(bothFlipped.x, bothFlipped.y, newColor);
+          // history.current.add(bothFlipped.x, bothFlipped.y, newColor.slice(0));
+        // }
 
         if (!spanAbove && rr > 0 && this.isPixel(cc, rr - 1, oldColor)) {
           stack.push([cc, rr - 1]);
@@ -573,6 +587,10 @@ class Vector2 {
     this.values = [x, y];
   }
 
+  add(that) {
+    return new Vector2(this.x + that.x, this.y + that.y);
+  }
+
   subtract(that) {
     return new Vector2(this.x - that.x, this.y - that.y);
   }
@@ -595,6 +613,10 @@ class Vector2 {
 
   set y(value) {
     this.values[1] = value;
+  }
+
+  get magnitude() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
   }
 
   abs() {
@@ -882,25 +904,97 @@ void main() {
 }
 
 function createRotationalMirroringAxes() {
-  let vertices = [
-    0.0, 0.0, 0.0, 1.0,
-    0.0, 1.0, 0.0, 1.0,
-    0.0, 0.0, 0.0, 1.0,
-    1.0, 0.0, 0.0, 1.0,
-  ];
-
   rotationalMirroringAxesVao = gl.createVertexArray();
   gl.bindVertexArray(rotationalMirroringAxesVao);
+  rotationalMirroringAxesVbo = gl.createBuffer();
+  updateRotationalMirroringAxes();
+}
 
-  let vbo = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+function createArrayTilingGrid() {
+  arrayTilingGridVao = gl.createVertexArray();
+  gl.bindVertexArray(arrayTilingGridVao);
+  arrayTilingGridVbo = gl.createBuffer();
+  updateArrayTilingGrid();
+}
+
+function updateRotationalMirroringAxes() {
+  let vertices = [];
+
+  let delta = 2 * Math.PI / wedgeCount;
+  for (let i = 0; i < wedgeCount; ++i) {
+    // Center
+    vertices.push(0);
+    vertices.push(0);
+    vertices.push(0);
+    vertices.push(1);
+
+    // The anchor is the positive y-axis.
+    let base = 2 * Math.PI / 4;
+    base += rotationOffset * Math.PI / 180;
+
+    let theta = i * delta + base;
+    let radius = 1.414;
+
+    // Perimeter Point
+    vertices.push(radius * Math.cos(theta));
+    vertices.push(radius * Math.sin(theta));
+    vertices.push(0);
+    vertices.push(1);
+  }
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, rotationalMirroringAxesVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
   let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
   gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(positionAttributeLocation);
+}
 
-  console.log("hi");
+function updateArrayTilingGrid() {
+  let vertices = [];
+
+  arrayTilingLineCount = 0;
+
+  if (image) {
+    for (let x = tileSize.x; x < image.width; x += tileSize.x) {
+      let xx = x / (image.width) * 2 - 1;
+
+      vertices.push(xx);
+      vertices.push(-1);
+      vertices.push(0);
+      vertices.push(1);
+
+      vertices.push(xx);
+      vertices.push(1);
+      vertices.push(0);
+      vertices.push(1);
+
+      arrayTilingLineCount += 1;
+    }
+
+    for (let y = tileSize.y; y < image.height; y += tileSize.y) {
+      let yy = y / (image.height) * 2 - 1;
+
+      vertices.push(-1);
+      vertices.push(yy);
+      vertices.push(0);
+      vertices.push(1);
+
+      vertices.push(1);
+      vertices.push(yy);
+      vertices.push(0);
+      vertices.push(1);
+
+      arrayTilingLineCount += 1;
+    }
+  }
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, arrayTilingGridVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(positionAttributeLocation);
 }
 
 function createImage() {
@@ -974,7 +1068,7 @@ void main() {
   gl.useProgram(null);
 }
 
-function screenToImage(screenX, screenY) {
+function screenToObject(screenX, screenY) {
   let positionScreen = [screenX, screenY];
 
   // Normalize the screen coordinates to [-1, 1] space.
@@ -985,14 +1079,17 @@ function screenToImage(screenX, screenY) {
     1
   ];
 
-
   let positionClip = inverseProjection.multiplyVector(positionNormalized);
   let positionObject = modelview.inverse().multiplyVector(positionClip);
+
+  return positionObject;
+}
+
+function objectToImage(positionObject) {
   let positionImage = new Vector2(
     Math.floor((positionObject[0] * 0.5 + 0.5) * image.width),
     image.height - 1 - Math.floor((positionObject[1] * 0.5 + 0.5) * image.height)
   );
-
   return positionImage;
 }
 
@@ -1004,28 +1101,55 @@ function setPixelToCurrentColor(p) {
 
 function drawPixel(p) {
   if (image.containsPixel(p)) {
-    setPixelToCurrentColor(p);
-
-    let midX = Math.floor(image.width / 2);
-    let midY = Math.floor(image.height / 2);
-    
-    let horizontallyFlipped = new Vector2(midX - (p.x - midX), p.y);
-    let verticallyFlipped = new Vector2(p.x, midY - (p.y - midY));
-    let bothFlipped = new Vector2(horizontallyFlipped.x, verticallyFlipped.y);
-
-    if (isHorizontallySymmetric && image.containsPixel(horizontallyFlipped)) {
-      setPixelToCurrentColor(horizontallyFlipped);
-    }
-
-    if (isVerticallySymmetric && image.containsPixel(verticallyFlipped)) {
-      setPixelToCurrentColor(verticallyFlipped);
-    }
-
-    if (isVerticallySymmetric && isHorizontallySymmetric && image.containsPixel(bothFlipped)) {
-      setPixelToCurrentColor(bothFlipped);
-    }
-
     rememberColor();
+
+    if (drawingMode == DrawingMode.None) {
+      setPixelToCurrentColor(p);
+    } else if (drawingMode == DrawingMode.ArrayTiling) {
+      for (let r = p.y % tileSize.y; r < image.height; r += tileSize.y) {
+        for (let c = p.x % tileSize.x; c < image.width; c += tileSize.x) {
+          setPixelToCurrentColor(new Vector2(c, r));
+        }
+      }
+    } else if (drawingMode == DrawingMode.RotationalMirroring) {
+      let middle = image.size.subtract(new Vector2(1, 1)).multiplyScalar(0.5);
+      let diff = p.subtract(middle);
+      let radius = diff.magnitude;
+      let theta = Math.atan2(diff.y, diff.x);
+      let radiansPerWedge = 2 * Math.PI / wedgeCount;
+
+      // Start at positive x-axis and wind counterclockwise to 2 * pi.
+      if (theta < 0) {
+        theta = -theta;
+      } else {
+        theta = 2 * Math.PI - theta;
+      }
+
+      theta -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
+
+      if (theta < 0) {
+        theta += 2 * Math.PI;
+      }
+
+      let iWedge0 = Math.floor(theta / radiansPerWedge);
+      let radiansFromWedgeStart = theta - iWedge0 * radiansPerWedge;
+
+      for (let i = 0; i < wedgeCount; ++i) {
+        let phi;
+        if (i % 2 == iWedge0 % 2) {
+          phi = i * radiansPerWedge + radiansFromWedgeStart;
+        } else {
+          phi = (i + 1) % wedgeCount * radiansPerWedge - radiansFromWedgeStart;
+        }
+
+        phi -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
+
+        let pp = new Vector2(radius * Math.cos(phi), radius * Math.sin(phi)).add(middle).round();
+        if (image.containsPixel(pp)) {
+          setPixelToCurrentColor(pp);
+        }
+      }
+    }
   }
 }
 
@@ -1040,7 +1164,8 @@ function drawLine(from, to) {
 
 function onMouseDown(e) {
   mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
-  mouseImage = screenToImage(mouseScreen.x, mouseScreen.y);
+  let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
+  mouseImage = objectToImage(mouseObject);
 
   if (e.which == 1) {
     if (activeToolDiv == tools.pencil) {
@@ -1071,7 +1196,8 @@ function selectColor(rgba) {
 function onMouseUp(e) {
   if (activeToolDiv == tools.bucket) {
     mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
-    mouseImage = screenToImage(mouseScreen.x, mouseScreen.y);
+    let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
+    mouseImage = objectToImage(mouseObject);
 
     if (isOverImage(mouseImage)) {
       history.begin(new UndoablePixels());
@@ -1093,7 +1219,8 @@ function onMouseMove(e) {
   }
 
   let newMouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
-  let newMouseImage = screenToImage(newMouseScreen.x, newMouseScreen.y);
+  let newMouseObject = screenToObject(newMouseScreen.x, newMouseScreen.y);
+  let newMouseImage = objectToImage(newMouseObject);
   pixelCoordinatesBox.innerText = `${newMouseImage.x}, ${newMouseImage.y}`;
 
   if (lockAxis == null && mouseScreen && !newMouseScreen.equals(mouseScreen) && e.shiftKey) {
@@ -1166,6 +1293,8 @@ function onMouseWheel(e) {
 }
 
 function onReady() {
+
+  // Grab references to widgets.
   canvas = document.getElementById('canvas');
   undosList = document.getElementById('undosList');
   channelsRoot = document.getElementById('channelsRoot');
@@ -1177,23 +1306,52 @@ function onReady() {
   resizeTopBox = document.getElementById('resizeTopBox');
   resizeBottomBox = document.getElementById('resizeBottomBox');
   pixelCoordinatesBox = document.getElementById('pixelCoordinatesBox');
+  autoDrawNoneButton = document.getElementById('autoDrawNoneButton');
+  autoDrawRotationalMirroringButton = document.getElementById('autoDrawRotationalMirroringButton');
+  autoDrawArrayTilingButton = document.getElementById('autoDrawArrayTilingButton');
+  wedgeCountBox = document.getElementById('wedgeCountBox');
+  rotationOffsetBox = document.getElementById('rotationOffsetBox');
+  tileWidthBox = document.getElementById('tileWidthBox');
+  tileHeightBox = document.getElementById('tileHeightBox');
 
+  // Set default state.
+  modelview = new Matrix4();
+  isShift = false;
+  wedgeCount = 4;
+  rotationOffset = 0;
+  drawingMode = DrawingMode.ArrayTiling;
+  tileSize = new Vector2(16, 16);
+
+  // Initialize OpenGL.
   gl = canvas.getContext('webgl2');
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-
-  modelview = new Matrix4();
-  isHorizontallySymmetric = false;
-  isVerticallySymmetric = false;
-  isShift = false;
 
   createBackground();
   createImage();
   createLinesProgram();
+  createArrayTilingGrid();
   createRotationalMirroringAxes();
+
   render();
 
+  syncWidgets();
   registerCallbacks();
   onSize();
+}
+
+function syncWidgets() {
+  if (drawingMode == DrawingMode.None) {
+    autoDrawNoneButton.checked = true;
+  } else if (drawingMode == DrawingMode.RotationalMirroring) {
+    autoDrawRotationalMirroringButton.checked = true;
+  } else if (drawingMode == DrawingMode.ArrayTiling) {
+    autoDrawArrayTilingButton.checked = true;
+  }
+
+  wedgeCountBox.value = wedgeCount;
+  rotationOffsetBox.value = rotationOffset;
+  tileWidthBox.value = tileSize.x;
+  tileHeightBox.value = tileSize.y;
 }
 
 function registerCallbacks() {
@@ -1298,37 +1456,44 @@ function registerCallbacks() {
 
   document.getElementById('nameColor').addEventListener('click', nameColor);
 
-  let autoDrawNoneButton = document.getElementById('autoDrawNoneButton');
   autoDrawNoneButton.addEventListener('click', () => {
     drawingMode = DrawingMode.None; 
+    render();
   });
 
-  let autoDrawRotationalMirroringButton = document.getElementById('autoDrawRotationalMirroringButton');
   autoDrawRotationalMirroringButton.addEventListener('click', () => {
     drawingMode = DrawingMode.RotationalMirroring; 
+    render();
   });
 
-  let autoDrawArrayTilingButton = document.getElementById('autoDrawArrayTilingButton');
   autoDrawArrayTilingButton.addEventListener('click', () => {
     drawingMode = DrawingMode.ArrayTiling; 
+    render();
   });
 
-  let wedgeCountBox = document.getElementById('wedgeCountBox');
   wedgeCountBox.addEventListener('input', e => {
     wedgeCount = parseInt(wedgeCountBox.value);
     updateRotationalMirroringAxes();
+    render();
   });
 
-  let rotationOffsetBox = document.getElementById('rotationOffsetBox');
   rotationOffsetBox.addEventListener('input', e => {
     rotationOffset = parseFloat(rotationOffsetBox.value);
     updateRotationalMirroringAxes();
+    render();
   });
-}
 
-function updateRotationalMirroringAxes() {
-  console.log("wedgeCount:", wedgeCount);
-  console.log("rotationOffset:", rotationOffset);
+  tileWidthBox.addEventListener('input', e => {
+    tileSize.x = parseInt(tileWidthBox.value);
+    updateArrayTilingGrid();
+    render();
+  });
+
+  tileHeightBox.addEventListener('input', e => {
+    tileSize.y = parseInt(tileHeightBox.value);
+    updateArrayTilingGrid();
+    render();
+  });
 }
 
 function activateTool(div) {
@@ -1426,13 +1591,23 @@ function render() {
     gl.bindVertexArray(null);
     gl.useProgram(null);
 
-    gl.useProgram(linesProgram);
-    gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
-    gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
-    gl.bindVertexArray(rotationalMirroringAxesVao);
-    gl.drawArrays(gl.LINES, 0, 4);
-    gl.bindVertexArray(null);
-    gl.useProgram(null);
+    if (drawingMode == DrawingMode.RotationalMirroring) {
+      gl.useProgram(linesProgram);
+      gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
+      gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
+      gl.bindVertexArray(rotationalMirroringAxesVao);
+      gl.drawArrays(gl.LINES, 0, wedgeCount * 2);
+      gl.bindVertexArray(null);
+      gl.useProgram(null);
+    } else if (drawingMode == DrawingMode.ArrayTiling) {
+      gl.useProgram(linesProgram);
+      gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
+      gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
+      gl.bindVertexArray(arrayTilingGridVao);
+      gl.drawArrays(gl.LINES, 0, arrayTilingLineCount * 2);
+      gl.bindVertexArray(null);
+      gl.useProgram(null);
+    }
   }
 }
 
@@ -1493,6 +1668,7 @@ function loadImage(path, width, height, nchannels, pixels) {
   updateProjection();
   gl.activeTexture(gl.TEXTURE1);
   imageTexture = new Texture(image);
+  updateArrayTilingGrid();
   render();
   syncResizeButton();
 }
