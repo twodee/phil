@@ -1353,7 +1353,7 @@ function onMouseMove(e) {
   let newMouseImage = objectToImage(newMouseObject);
   pixelCoordinatesBox.innerText = `${newMouseImage.x}, ${newMouseImage.y}`;
 
-  if (lockAxis == null && mouseScreen && !newMouseScreen.equals(mouseScreen) && e.shiftKey) {
+  if (lockAxis == null && mouseImage && !newMouseImage.equals(mouseImage) && e.shiftKey) {
     let diff = newMouseScreen.subtract(mouseScreen).abs();
     if (diff.x > diff.y) {
       lockAxis = 1;
@@ -1364,8 +1364,10 @@ function onMouseMove(e) {
 
   if (lockAxis == 0) {
     newMouseScreen.x = mouseScreen.x;
+    newMouseImage.x = mouseImage.x;
   } else if (lockAxis == 1) {
     newMouseScreen.y = mouseScreen.y;
+    newMouseImage.y = mouseImage.y;
   }
 
   syncCursor(newMouseImage);
