@@ -15,6 +15,20 @@ let linesProgram;
 let linesProjectionUniform;
 let linesModelviewUniform;
 
+// Grid
+let isGridShown;
+let isGridShownBox;
+let gridCellSize;
+let gridVao;
+let gridVbo;
+let gridCellWidthBox;
+let gridCellHeightBox;
+let gridLineCount;
+
+// Border
+let borderVao;
+let borderVbo;
+
 // Rotational mirroring
 let rotationalMirroringAxesVao;
 let rotationalMirroringAxesVbo;
@@ -903,6 +917,20 @@ void main() {
   linesModelviewUniform = gl.getUniformLocation(linesProgram, 'modelview');
 }
 
+function createBorder() {
+  borderVao = gl.createVertexArray();
+  gl.bindVertexArray(borderVao);
+  borderVbo = gl.createBuffer();
+  updateBorder();
+}
+
+function createGrid() {
+  gridVao = gl.createVertexArray();
+  gl.bindVertexArray(gridVao);
+  gridVbo = gl.createBuffer();
+  updateGrid();
+}
+
 function createRotationalMirroringAxes() {
   rotationalMirroringAxesVao = gl.createVertexArray();
   gl.bindVertexArray(rotationalMirroringAxesVao);
@@ -990,6 +1018,84 @@ function updateArrayTilingGrid() {
   }
 
   gl.bindBuffer(gl.ARRAY_BUFFER, arrayTilingGridVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(positionAttributeLocation);
+}
+
+function updateGrid() {
+  let vertices = [];
+
+  gridLineCount = 0;
+
+  if (image) {
+    for (let x = gridCellSize.x; x < image.width; x += gridCellSize.x) {
+      let xx = x / (image.width) * 2 - 1;
+
+      vertices.push(xx);
+      vertices.push(-1);
+      vertices.push(0);
+      vertices.push(1);
+
+      vertices.push(xx);
+      vertices.push(1);
+      vertices.push(0);
+      vertices.push(1);
+
+      gridLineCount += 1;
+    }
+
+    for (let y = gridCellSize.y; y < image.height; y += gridCellSize.y) {
+      let yy = y / (image.height) * 2 - 1;
+
+      vertices.push(-1);
+      vertices.push(yy);
+      vertices.push(0);
+      vertices.push(1);
+
+      vertices.push(1);
+      vertices.push(yy);
+      vertices.push(0);
+      vertices.push(1);
+
+      gridLineCount += 1;
+    }
+  }
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, gridVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(positionAttributeLocation);
+}
+
+function updateBorder() {
+  let vertices = [];
+
+  vertices.push(-1);
+  vertices.push(-1);
+  vertices.push(0);
+  vertices.push(1);
+
+  vertices.push(1);
+  vertices.push(-1);
+  vertices.push(0);
+  vertices.push(1);
+
+  vertices.push(1);
+  vertices.push(1);
+  vertices.push(0);
+  vertices.push(1);
+
+  vertices.push(-1);
+  vertices.push(1);
+  vertices.push(0);
+  vertices.push(1);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, borderVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
   let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
@@ -1313,14 +1419,19 @@ function onReady() {
   rotationOffsetBox = document.getElementById('rotationOffsetBox');
   tileWidthBox = document.getElementById('tileWidthBox');
   tileHeightBox = document.getElementById('tileHeightBox');
+  gridCellWidthBox = document.getElementById('gridCellWidthBox');
+  gridCellHeightBox = document.getElementById('gridCellHeightBox');
+  isGridShownBox = document.getElementById('isGridShownBox');
 
   // Set default state.
   modelview = new Matrix4();
   isShift = false;
   wedgeCount = 4;
   rotationOffset = 0;
-  drawingMode = DrawingMode.ArrayTiling;
+  drawingMode = DrawingMode.None;
   tileSize = new Vector2(16, 16);
+  gridCellSize = new Vector2(4, 4);
+  isGridShown = false;
 
   // Initialize OpenGL.
   gl = canvas.getContext('webgl2');
@@ -1331,6 +1442,8 @@ function onReady() {
   createLinesProgram();
   createArrayTilingGrid();
   createRotationalMirroringAxes();
+  createGrid();
+  createBorder();
 
   render();
 
@@ -1352,6 +1465,9 @@ function syncWidgets() {
   rotationOffsetBox.value = rotationOffset;
   tileWidthBox.value = tileSize.x;
   tileHeightBox.value = tileSize.y;
+  gridCellWidthBox.value = gridCellSize.x;
+  gridCellHeightBox.value = gridCellSize.y;
+  isGridShownBox.checked = isGridShown;
 }
 
 function registerCallbacks() {
@@ -1494,6 +1610,23 @@ function registerCallbacks() {
     updateArrayTilingGrid();
     render();
   });
+
+  gridCellWidthBox.addEventListener('input', e => {
+    gridCellSize.x = parseInt(gridCellWidthBox.value);
+    updateGrid();
+    render();
+  });
+
+  gridCellHeightBox.addEventListener('input', e => {
+    gridCellSize.y = parseInt(gridCellHeightBox.value);
+    updateGrid();
+    render();
+  });
+
+  isGridShownBox.addEventListener('click', e => {
+    isGridShown = isGridShownBox.checked;
+    render();
+  });
 }
 
 function activateTool(div) {
@@ -1591,23 +1724,29 @@ function render() {
     gl.bindVertexArray(null);
     gl.useProgram(null);
 
+    // Draw lines.
+    gl.useProgram(linesProgram);
+    gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
+    gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
+
     if (drawingMode == DrawingMode.RotationalMirroring) {
-      gl.useProgram(linesProgram);
-      gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
-      gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
       gl.bindVertexArray(rotationalMirroringAxesVao);
       gl.drawArrays(gl.LINES, 0, wedgeCount * 2);
-      gl.bindVertexArray(null);
-      gl.useProgram(null);
     } else if (drawingMode == DrawingMode.ArrayTiling) {
-      gl.useProgram(linesProgram);
-      gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
-      gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
       gl.bindVertexArray(arrayTilingGridVao);
       gl.drawArrays(gl.LINES, 0, arrayTilingLineCount * 2);
-      gl.bindVertexArray(null);
-      gl.useProgram(null);
     }
+
+    if (isGridShown) {
+      gl.bindVertexArray(gridVao);
+      gl.drawArrays(gl.LINES, 0, gridLineCount * 2);
+    }
+
+    gl.bindVertexArray(borderVao);
+    gl.drawArrays(gl.LINE_LOOP, 0, 4);
+
+    gl.bindVertexArray(null);
+    gl.useProgram(null);
   }
 }
 
@@ -1668,7 +1807,10 @@ function loadImage(path, width, height, nchannels, pixels) {
   updateProjection();
   gl.activeTexture(gl.TEXTURE1);
   imageTexture = new Texture(image);
+
   updateArrayTilingGrid();
+  updateGrid();
+
   render();
   syncResizeButton();
 }

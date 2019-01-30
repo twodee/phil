@@ -64,7 +64,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader open">Autodraw</div>
+        <div class="panelHeader">Autodraw</div>
         <div class="panelBody">
           <div class="autoDrawSection">
             <label><input type="radio" id="autoDrawNoneButton" name="autoDraw" checked>None</label>
@@ -91,8 +91,15 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Grid</div>
+        <div class="panelHeader open">Grid</div>
         <div class="panelBody">
+          <div id="gridRoot">
+            <label class="span2"><input type="checkbox" id="isGridShownBox"><span>Show grid</span></label>
+            <span>Cell width</span>
+            <input type="number" value="5" min="1" id="gridCellWidthBox">
+            <span>Cell height</span>
+            <input type="number" value="5" min="1" id="gridCellHeightBox">
+          </div>
         </div>
       </div>
 

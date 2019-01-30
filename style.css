@@ -128,6 +128,17 @@ body {
   grid-row-gap: 5px;
 }
 
+#gridRoot {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-column-gap: 5px;
+  grid-row-gap: 5px;
+}
+
+.span2 {
+  grid-column-end: span 2;
+}
+
 .tool {
   display: inline-block;
   font-size: 24px;
@@ -284,4 +295,9 @@ legend {
 
 .autoDrawSection:not(:last-child) {
   margin-bottom: 1em;
+}
+
+input[type="radio"], input[type="checkbox"] {
+  vertical-align: text-bottom; 
+  margin-right: 5px;
 }
