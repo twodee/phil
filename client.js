@@ -211,6 +211,30 @@ class UndoHistory {
     this.modify(id, includeSuccessors, true);
   }
 
+  undoMostRecent() {
+    for (let i = this.undos.length - 1; i >= 0; --i) {
+      if (this.undos[i].isDone) {
+        this.undos[i].checkbox.checked = false;
+        this.undos[i].isDone = false;
+        this.undos[i].setPixelsToLatest(this);
+        render();
+        return;
+      }
+    }
+  }
+
+  redoMostRecent() {
+    for (let i = this.undos.length - 1; i >= 0 && !this.undos[i].isDone; --i) {
+      if (i == 0 || this.undos[i - 1].isDone) {
+        this.undos[i].checkbox.checked = true;
+        this.undos[i].isDone = true;
+        this.undos[i].setPixelsToLatest(this);
+        render();
+        return;
+      }
+    }
+  }
+
   getMostRecentSize() {
     for (let i = this.undos.length - 1; i >= 0; --i) {
       if (this.undos[i].isDone) {
@@ -1519,6 +1543,10 @@ function registerCallbacks() {
       activateTool(tools.dropper);
     } else if (e.key == 'b') {
       activateTool(tools.bucket);
+    } else if (e.key == '[') {
+      history.undoMostRecent();
+    } else if (e.key == ']') {
+      history.redoMostRecent();
     } else if (e.key == 'Shift') {
       isShift = true;
     }
