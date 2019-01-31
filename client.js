@@ -471,29 +471,8 @@ class Image {
 
       while (cc < this.width && this.isPixel(cc, rr, oldColor)) {
         this.set(cc, rr, newColor);
+        drawKnownPixel(new Vector2(cc, rr));
         history.current.add(cc, rr, newColor.slice(0));
-
-        let midX = Math.floor(this.width / 2);
-        let midY = Math.floor(this.height / 2);
-        
-        let horizontallyFlipped = new Vector2(midX - (cc - midX), rr);
-        let verticallyFlipped = new Vector2(cc, midY - (rr - midY));
-        let bothFlipped = new Vector2(horizontallyFlipped.x, verticallyFlipped.y);
-
-        if (isHorizontallySymmetric && this.containsPixel(horizontallyFlipped)) {
-          this.set(horizontallyFlipped.x, horizontallyFlipped.y, newColor);
-          history.current.add(horizontallyFlipped.x, horizontallyFlipped.y, newColor.slice(0));
-        }
-
-        // if (isVerticallySymmetric && this.containsPixel(verticallyFlipped)) {
-          // this.set(verticallyFlipped.x, verticallyFlipped.y, newColor);
-          // history.current.add(verticallyFlipped.x, verticallyFlipped.y, newColor.slice(0));
-        // }
-
-        // if (isVerticallySymmetric && isHorizontallySymmetric && this.containsPixel(bothFlipped)) {
-          // this.set(bothFlipped.x, bothFlipped.y, newColor);
-          // history.current.add(bothFlipped.x, bothFlipped.y, newColor.slice(0));
-        // }
 
         if (!spanAbove && rr > 0 && this.isPixel(cc, rr - 1, oldColor)) {
           stack.push([cc, rr - 1]);
@@ -1229,57 +1208,60 @@ function setPixelToCurrentColor(p) {
   imageTexture.uploadPixel(p.x, p.y);
 }
 
+function drawKnownPixel(p) {
+  if (drawingMode == DrawingMode.None) {
+    setPixelToCurrentColor(p);
+  } else if (drawingMode == DrawingMode.ArrayTiling) {
+    for (let r = p.y % tileSize.y; r < image.height; r += tileSize.y) {
+      for (let c = p.x % tileSize.x; c < image.width; c += tileSize.x) {
+        setPixelToCurrentColor(new Vector2(c, r));
+      }
+    }
+  } else if (drawingMode == DrawingMode.RotationalMirroring) {
+    let middle = image.size.subtract(new Vector2(1, 1)).multiplyScalar(0.5);
+    let diff = p.subtract(middle);
+    let radius = diff.magnitude;
+    let theta = Math.atan2(diff.y, diff.x);
+    let radiansPerWedge = 2 * Math.PI / wedgeCount;
+
+    // Start at positive x-axis and wind counterclockwise to 2 * pi.
+    if (theta < 0) {
+      theta = -theta;
+    } else {
+      theta = 2 * Math.PI - theta;
+    }
+
+    theta -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
+
+    if (theta < 0) {
+      theta += 2 * Math.PI;
+    }
+
+    let iWedge0 = Math.floor(theta / radiansPerWedge);
+    let radiansFromWedgeStart = theta - iWedge0 * radiansPerWedge;
+
+    for (let i = 0; i < wedgeCount; ++i) {
+      let phi;
+      if (i % 2 == iWedge0 % 2) {
+        phi = i * radiansPerWedge + radiansFromWedgeStart;
+      } else {
+        phi = (i + 1) % wedgeCount * radiansPerWedge - radiansFromWedgeStart;
+      }
+
+      phi -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
+
+      let pp = new Vector2(radius * Math.cos(phi), radius * Math.sin(phi)).add(middle).round();
+      if (image.containsPixel(pp)) {
+        setPixelToCurrentColor(pp);
+      }
+    }
+  }
+}
+
 function drawPixel(p) {
   if (image.containsPixel(p)) {
     rememberColor();
-
-    if (drawingMode == DrawingMode.None) {
-      setPixelToCurrentColor(p);
-    } else if (drawingMode == DrawingMode.ArrayTiling) {
-      for (let r = p.y % tileSize.y; r < image.height; r += tileSize.y) {
-        for (let c = p.x % tileSize.x; c < image.width; c += tileSize.x) {
-          setPixelToCurrentColor(new Vector2(c, r));
-        }
-      }
-    } else if (drawingMode == DrawingMode.RotationalMirroring) {
-      let middle = image.size.subtract(new Vector2(1, 1)).multiplyScalar(0.5);
-      let diff = p.subtract(middle);
-      let radius = diff.magnitude;
-      let theta = Math.atan2(diff.y, diff.x);
-      let radiansPerWedge = 2 * Math.PI / wedgeCount;
-
-      // Start at positive x-axis and wind counterclockwise to 2 * pi.
-      if (theta < 0) {
-        theta = -theta;
-      } else {
-        theta = 2 * Math.PI - theta;
-      }
-
-      theta -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
-
-      if (theta < 0) {
-        theta += 2 * Math.PI;
-      }
-
-      let iWedge0 = Math.floor(theta / radiansPerWedge);
-      let radiansFromWedgeStart = theta - iWedge0 * radiansPerWedge;
-
-      for (let i = 0; i < wedgeCount; ++i) {
-        let phi;
-        if (i % 2 == iWedge0 % 2) {
-          phi = i * radiansPerWedge + radiansFromWedgeStart;
-        } else {
-          phi = (i + 1) % wedgeCount * radiansPerWedge - radiansFromWedgeStart;
-        }
-
-        phi -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
-
-        let pp = new Vector2(radius * Math.cos(phi), radius * Math.sin(phi)).add(middle).round();
-        if (image.containsPixel(pp)) {
-          setPixelToCurrentColor(pp);
-        }
-      }
-    }
+    drawKnownPixel(p);
   }
 }
 
@@ -1538,27 +1520,27 @@ function registerCallbacks() {
   canvas.addEventListener('wheel', onMouseWheel);
   window.addEventListener('mouseup', onMouseUp);
 
-  window.addEventListener('keydown', e => {
-    if (e.key == 'p') {
-      activateTool(tools.pencil);
-    } else if (e.key == 'e') {
-      activateTool(tools.dropper);
-    } else if (e.key == 'b') {
-      activateTool(tools.bucket);
-    } else if (e.key == '[') {
-      history.undoMostRecent();
-    } else if (e.key == ']') {
-      history.redoMostRecent();
-    } else if (e.key == 'Shift') {
-      isShift = true;
-    }
-  });
+  // window.addEventListener('keydown', e => {
+    // if (e.key == 'p') {
+      // activateTool(tools.pencil);
+    // } else if (e.key == 'e') {
+      // activateTool(tools.dropper);
+    // } else if (e.key == 'b') {
+      // activateTool(tools.bucket);
+    // } else if (e.key == '[') {
+      // history.undoMostRecent();
+    // } else if (e.key == ']') {
+      // history.redoMostRecent();
+    // } else if (e.key == 'Shift') {
+      // isShift = true;
+    // }
+  // });
 
-  window.addEventListener('keyup', e => {
-    if (e.key == 'Shift') {
-      isShift = false;
-    }
-  });
+  // window.addEventListener('keyup', e => {
+    // if (e.key == 'Shift') {
+      // isShift = false;
+    // }
+  // });
   
   resizeButton.addEventListener('click', () => {
     let l = parseInt(resizeLeftBox.value);

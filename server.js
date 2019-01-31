@@ -1,4 +1,4 @@
-const { app, Menu, BrowserWindow, ipcMain } = require('electron');
+const { app, Menu, BrowserWindow, ipcMain, dialog } = require('electron');
 const minimist = require('minimist');
 const sharp = require('sharp');
 // https://sharp.dimens.io
@@ -53,16 +53,30 @@ function createMenu() {
 			]
 		},
 		{
-			label: 'View',
+			label: 'Boo',
 			submenu: [
-				{role: 'reload'},
-				{role: 'forcereload'},
+				// {role: 'reload'},
+				// {role: 'forcereload'},
 
 				// {role: 'toggledevtools'},
 				// {role: 'togglefullscreen'}
 
         // The accelerators for some roles aren't working properly on Linux. I
         // guess I'll "role" my own.
+        {
+          label: 'Reload',
+          accelerator: 'CommandOrControl+R',
+          click(item, focusedWindow) {
+            focusedWindow.reload();
+          },
+        },
+        {
+          label: 'Force Reload',
+          accelerator: 'CommandOrControl+Shift+R',
+          click(item, focusedWindow) {
+            focusedWindow.webContents.reloadIgnoringCache();
+          },
+        },
         {
           label: 'Toggle Developer Tools',
           accelerator: 'CommandOrControl+Shift+I',
@@ -73,7 +87,7 @@ function createMenu() {
 				{type: 'separator'},
         {
           label: 'Toggle Fullscreen',
-          accelerator: 'Alt+F11',
+          accelerator: 'F11',
           click(item, focusedWindow) {
             focusedWindow.setFullScreen(!focusedWindow.isFullScreen());
           },
