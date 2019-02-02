@@ -1,10 +1,13 @@
 const { app, Menu, BrowserWindow, ipcMain, dialog } = require('electron');
 const minimist = require('minimist');
+const fs = require('fs');
 const sharp = require('sharp');
 // https://sharp.dimens.io
 
+let preferencesPath;
 let colorHistory = [];
 let colorPalette = [];
+let argv;
 
 function createMenu() {
 	const template = [
@@ -55,12 +58,6 @@ function createMenu() {
 		{
 			label: 'View',
 			submenu: [
-				// {role: 'reload'},
-				// {role: 'forcereload'},
-
-				// {role: 'toggledevtools'},
-				// {role: 'togglefullscreen'}
-
         // The accelerators for some roles aren't working properly on Linux. I
         // guess I'll "role" my own.
         {
@@ -106,11 +103,6 @@ function createMenu() {
           role: 'about',
         },
         { type: 'separator' },
-        // {
-          // label: 'Services',
-          // role: 'services',
-          // submenu: [],
-        // },
         { type: 'separator' },
         {
           label: `Hide ${name}`,
@@ -141,40 +133,42 @@ function createMenu() {
 }
 
 function createWindow() {
-  let image;
-  let path;
+  let images = [];
   
-  if (argv._.length == 1) {
-    path = argv._[0];
-    image = sharp(path);
-  } else if (argv._.length == 2) {
-    path = null;
+  if (argv._.length == 2 && Number.isInteger(argv._[0]) && Number.isInteger(argv._[1])) {
     let width = parseInt(argv._[0]);
     let height = parseInt(argv._[1]);
-
-    if (!isNaN(width) && !isNaN(height)) {
-      image = sharp({
-        create: {
-          width: width,
-          height: height,
-          channels: 4,
-          background: { r: argv.background[0], g: argv.background[1], b: argv.background[2], alpha: argv.background[3] },
-        }
-      });
+    let image = sharp({
+      create: {
+        width: width,
+        height: height,
+        channels: 4,
+        background: { r: argv.background[0], g: argv.background[1], b: argv.background[2], alpha: argv.background[3] },
+      }
+    });
+    images.push({ path: null, sharp: image });
+  } else {
+    for (let path of argv._) {
+      images.push({ path: path, sharp: sharp(path.toString()) });
     }
   }
 
-  if (!image) {
+  if (images.length == 0) {
     console.error("Usage: npm start -- path");
     console.error("       npm start -- width height");
     process.exit(0);
   }
 
-  image
+  for (let image of images) {
+    loadImage(image);
+  }
+}
+
+function loadImage(image) {
+  image.sharp
     .raw()
     .metadata()
     .then(meta => {
-
       if (meta.channels == 3) {
         image = image.joinChannel(Buffer.alloc(meta.width * meta.height, 255), {
           raw: {
@@ -185,7 +179,7 @@ function createWindow() {
         })
       }
 
-      image.toBuffer((error, data, info) => {
+      image.sharp.toBuffer((error, data, info) => {
         var browser = new BrowserWindow({
           width: 800,
           height: 600,
@@ -196,13 +190,16 @@ function createWindow() {
         // browser.webContents.openDevTools({mode: 'bottom'});
 
         browser.webContents.on('did-finish-load', () => {
-          browser.webContents.send('loadImage', path, info.width, info.height, info.channels, data);
+          browser.webContents.send('loadImage', image.path, info.width, info.height, info.channels, data);
+          browser.webContents.send('update-color-palette', colorPalette);
         });
       });
-    });
+    })
+  .catch(e => {
+    console.error(e);
+  });
 }
 
-let argv;
 app.on('ready', () => {
   argv = minimist(process.argv.slice(2), {
     default: {
@@ -219,7 +216,38 @@ app.on('ready', () => {
   }
 
   createMenu();
-  createWindow();
+  preferencesPath = require('os').homedir() + '/.phil.json';
+  console.log("preferencesPath:", preferencesPath);
+
+  if (fs.existsSync(preferencesPath)) {
+    fs.readFile(preferencesPath, 'utf8', (error, data) => {
+      if (error) {
+        console.error(error);
+      } else {
+        let preferences = JSON.parse(data);
+        if (preferences.hasOwnProperty('colorPalette')) {
+          colorPalette = preferences.colorPalette;
+          console.log("colorPalette:", colorPalette);
+        }
+      }
+      createWindow();
+    });
+  } else {
+    createWindow();
+  }
+});
+
+app.on('window-all-closed', () => {
+  app.quit();
+});
+
+app.on('will-quit', () => {
+  let prefs = {
+    colorPalette: colorPalette,
+  };
+  let json = JSON.stringify(prefs, null, 2);
+  console.log("json:", json);
+  fs.writeFileSync(preferencesPath, json, 'utf8');
 });
 
 ipcMain.on('remember-color', (event, color) => {
