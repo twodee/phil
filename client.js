@@ -14,6 +14,7 @@ DrawingMode.ArrayTiling = 2;
 let linesProgram;
 let linesProjectionUniform;
 let linesModelviewUniform;
+let linesColorUniform;
 
 // Grid
 let isGridShown;
@@ -905,10 +906,11 @@ void main() {
 
   let fragmentSource = `#version 300 es
 precision mediump float;
+uniform vec4 color;
 out vec4 fragmentColor;
 
 void main() {
-  fragmentColor = vec4(1.0);
+  fragmentColor = color;
 }
   `; 
 
@@ -918,6 +920,7 @@ void main() {
 
   linesProjectionUniform = gl.getUniformLocation(linesProgram, 'projection');
   linesModelviewUniform = gl.getUniformLocation(linesProgram, 'modelview');
+  linesColorUniform = gl.getUniformLocation(linesProgram, 'color');
 }
 
 function createBorder() {
@@ -1306,8 +1309,6 @@ function selectColor(rgba) {
 }
 
 function onMouseUp(e) {
-  console.log("e:", e);
-
   // Mouse up gets called on the window to handle going offscreen. But filling
   // should only happen when the bucket is released on the canvas.
   if (e.target == canvas && activeToolDiv == tools.bucket) {
@@ -1578,6 +1579,9 @@ function registerCallbacks() {
     history.begin(new UndoableImage());
     image.resizeDelta(t, r, b, l);
 
+    updateArrayTilingGrid();
+    updateGrid();
+
     imageTexture.upload();
     updateProjection();
     render();
@@ -1774,18 +1778,22 @@ function render() {
     gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
 
     if (drawingMode == DrawingMode.RotationalMirroring) {
+      gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.0, 1.0);
       gl.bindVertexArray(rotationalMirroringAxesVao);
       gl.drawArrays(gl.LINES, 0, wedgeCount * 2);
     } else if (drawingMode == DrawingMode.ArrayTiling) {
+      gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.0, 1.0);
       gl.bindVertexArray(arrayTilingGridVao);
       gl.drawArrays(gl.LINES, 0, arrayTilingLineCount * 2);
     }
 
     if (isGridShown) {
+      gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.0, 1.0);
       gl.bindVertexArray(gridVao);
       gl.drawArrays(gl.LINES, 0, gridLineCount * 2);
     }
 
+    gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.5, 1.0);
     gl.bindVertexArray(borderVao);
     gl.drawArrays(gl.LINE_LOOP, 0, 4);
 
