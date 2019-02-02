@@ -1251,7 +1251,7 @@ function drawKnownPixel(p) {
         phi = (i + 1) % wedgeCount * radiansPerWedge - radiansFromWedgeStart;
       }
 
-      phi -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
+      phi = -(phi + Math.PI * 0.5 + rotationOffset * Math.PI / 180);
 
       let pp = new Vector2(radius * Math.cos(phi), radius * Math.sin(phi)).add(middle).round();
       if (image.containsPixel(pp)) {
@@ -1439,7 +1439,7 @@ function onReady() {
   // Set default state.
   modelview = new Matrix4();
   isShift = false;
-  wedgeCount = 4;
+  wedgeCount = 3;
   rotationOffset = 0;
   drawingMode = DrawingMode.None;
   tileSize = new Vector2(16, 16);
@@ -1778,7 +1778,7 @@ function render() {
     gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
 
     if (drawingMode == DrawingMode.RotationalMirroring) {
-      gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.0, 1.0);
+      gl.uniform4f(linesColorUniform, 1.0, 1.0, 1.0, 1.0);
       gl.bindVertexArray(rotationalMirroringAxesVao);
       gl.drawArrays(gl.LINES, 0, wedgeCount * 2);
     } else if (drawingMode == DrawingMode.ArrayTiling) {
