@@ -301,3 +301,13 @@ input[type="radio"], input[type="checkbox"] {
   vertical-align: text-bottom; 
   margin-right: 5px;
 }
+
+.error:not(:focus) {
+  outline: red auto 5px;
+  outline-offset: -2px;
+  background-color: pink;
+}
+
+.error {
+  background-color: pink;
+}

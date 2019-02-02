@@ -1306,7 +1306,11 @@ function selectColor(rgba) {
 }
 
 function onMouseUp(e) {
-  if (activeToolDiv == tools.bucket) {
+  console.log("e:", e);
+
+  // Mouse up gets called on the window to handle going offscreen. But filling
+  // should only happen when the bucket is released on the canvas.
+  if (e.target == canvas && activeToolDiv == tools.bucket) {
     mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
     let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
     mouseImage = objectToImage(mouseObject);
@@ -1478,6 +1482,24 @@ function syncWidgets() {
   isGridShownBox.checked = isGridShown;
 }
 
+function assertIntegerGreaterThan(input, minimum, action) {
+  let isOkay = false;
+
+  if (isInteger(input.value)) {
+    let value = parseInt(input.value);
+    if (value > minimum) {
+      action(value);
+      isOkay = true;
+    }
+  }
+
+  if (isOkay) {
+    input.classList.remove('error');
+  } else {
+    input.classList.add('error');
+  }
+}
+
 function registerCallbacks() {
   // RGB sliders
   rgbWidgets = [
@@ -1520,27 +1542,27 @@ function registerCallbacks() {
   canvas.addEventListener('wheel', onMouseWheel);
   window.addEventListener('mouseup', onMouseUp);
 
-  // window.addEventListener('keydown', e => {
-    // if (e.key == 'p') {
-      // activateTool(tools.pencil);
-    // } else if (e.key == 'e') {
-      // activateTool(tools.dropper);
-    // } else if (e.key == 'b') {
-      // activateTool(tools.bucket);
-    // } else if (e.key == '[') {
-      // history.undoMostRecent();
-    // } else if (e.key == ']') {
-      // history.redoMostRecent();
-    // } else if (e.key == 'Shift') {
-      // isShift = true;
-    // }
-  // });
+  window.addEventListener('keydown', e => {
+    if (e.key == 'p') {
+      activateTool(tools.pencil);
+    } else if (e.key == 'e') {
+      activateTool(tools.dropper);
+    } else if (e.key == 'b') {
+      activateTool(tools.bucket);
+    } else if (e.key == '[') {
+      history.undoMostRecent();
+    } else if (e.key == ']') {
+      history.redoMostRecent();
+    } else if (e.key == 'Shift') {
+      isShift = true;
+    }
+  });
 
-  // window.addEventListener('keyup', e => {
-    // if (e.key == 'Shift') {
-      // isShift = false;
-    // }
-  // });
+  window.addEventListener('keyup', e => {
+    if (e.key == 'Shift') {
+      isShift = false;
+    }
+  });
   
   resizeButton.addEventListener('click', () => {
     let l = parseInt(resizeLeftBox.value);
@@ -1600,9 +1622,11 @@ function registerCallbacks() {
   });
 
   wedgeCountBox.addEventListener('input', e => {
-    wedgeCount = parseInt(wedgeCountBox.value);
-    updateRotationalMirroringAxes();
-    render();
+    assertIntegerGreaterThan(wedgeCountBox, 1, value => {
+      wedgeCount = value;
+      updateRotationalMirroringAxes();
+      render();
+    });
   });
 
   rotationOffsetBox.addEventListener('input', e => {
@@ -1612,27 +1636,35 @@ function registerCallbacks() {
   });
 
   tileWidthBox.addEventListener('input', e => {
-    tileSize.x = parseInt(tileWidthBox.value);
-    updateArrayTilingGrid();
-    render();
+    assertIntegerGreaterThan(tileWidthBox, 0, value => {
+      tileSize.x = value;
+      updateArrayTilingGrid();
+      render();
+    });
   });
 
   tileHeightBox.addEventListener('input', e => {
-    tileSize.y = parseInt(tileHeightBox.value);
-    updateArrayTilingGrid();
-    render();
+    assertIntegerGreaterThan(tileHeightBox, 0, value => {
+      tileSize.y = value;
+      updateArrayTilingGrid();
+      render();
+    });
   });
 
   gridCellWidthBox.addEventListener('input', e => {
-    gridCellSize.x = parseInt(gridCellWidthBox.value);
-    updateGrid();
-    render();
+    assertIntegerGreaterThan(gridCellWidthBox, 0, value => {
+      gridCellSize.x = value;
+      updateGrid();
+      render();
+    });
   });
 
   gridCellHeightBox.addEventListener('input', e => {
-    gridCellSize.y = parseInt(gridCellHeightBox.value);
-    updateGrid();
-    render();
+    assertIntegerGreaterThan(gridCellHeightBox, 0, value => {
+      gridCellSize.y = value;
+      updateGrid();
+      render();
+    });
   });
 
   isGridShownBox.addEventListener('click', e => {
@@ -1827,18 +1859,35 @@ function loadImage(path, width, height, nchannels, pixels) {
   syncResizeButton();
 }
 
+function isInteger(text) {
+  return text.match(/^-?\d+$/);
+}
+
+function isIntegerOrBlank(text) {
+  return text == '' || text.match(/^-?\d+$/);
+}
+
 function syncResizeButton() {
-  let l = parseInt(resizeLeftBox.value);
-  let r = parseInt(resizeRightBox.value);
-  let b = parseInt(resizeBottomBox.value);
-  let t = parseInt(resizeTopBox.value);
+  let resizeBoxes = [resizeTopBox, resizeRightBox, resizeBottomBox, resizeLeftBox];
+  let sizes = [];
 
-  if (isNaN(l)) l = 0;
-  if (isNaN(r)) r = 0;
-  if (isNaN(t)) t = 0;
-  if (isNaN(b)) b = 0;
+  for (let resizeBox of resizeBoxes) {
+    if (isIntegerOrBlank(resizeBox.value)) {
+      let value = parseInt(resizeBox.value);
+      sizes.push(isNaN(value) ? 0 : value);
+      resizeBox.classList.remove('error');
+    } else {
+      resizeBox.classList.add('error');
+    }
+  }
 
-  resizeButton.innerText = `Resize to ${image.width + l + r}x${image.height + t + b}`;
+  if (sizes.length == 4) {
+    resizeButton.innerText = `Resize to ${image.width + sizes[3] + sizes[1]}x${image.height + sizes[0] + sizes[2]}`;
+    resizeButton.disabled = false;
+  } else {
+    resizeButton.innerText = `Resize`;
+    resizeButton.disabled = true;
+  }
 }
 
 function saveImage(path) {

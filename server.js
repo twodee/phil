@@ -53,7 +53,7 @@ function createMenu() {
 			]
 		},
 		{
-			label: 'Boo',
+			label: 'View',
 			submenu: [
 				// {role: 'reload'},
 				// {role: 'forcereload'},
@@ -79,7 +79,7 @@ function createMenu() {
         },
         {
           label: 'Toggle Developer Tools',
-          accelerator: 'CommandOrControl+Shift+I',
+          accelerator: 'CommandOrControl+Alt+I',
           click(item, focusedWindow) {
             focusedWindow.toggleDevTools();
           },
