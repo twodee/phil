@@ -30,24 +30,36 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Color</div>
+        <div class="panelHeader open">Color</div>
         <div class="panelBody">
           <div id="channelsRoot">
             <span class="channelLabel">Red</span>
             <input type="range" class="channelSlider" id="redSlider" min="0" max="255">
-            <input type="textbox" class="channelBox" id="redBox" size="3">
+            <input type="textbox" class="channelBox" id="redBox" size="6">
 
             <span class="channelLabel">Green</span>
             <input type="range" class="channelSlider" id="greenSlider" min="0" max="255">
-            <input type="textbox" class="channelBox" id="greenBox" size="3">
+            <input type="textbox" class="channelBox" id="greenBox" size="6">
 
             <span class="channelLabel">Blue</span>
             <input type="range" class="channelSlider" id="blueSlider" min="0" max="255">
-            <input type="textbox" class="channelBox" id="blueBox" size="3">
+            <input type="textbox" class="channelBox" id="blueBox" size="6">
+
+            <span class="channelLabel">Hue</span>
+            <input type="range" class="channelSlider" id="hueSlider" min="0" max="360">
+            <input type="textbox" class="channelBox" id="hueBox" size="6">
+
+            <span class="channelLabel">Saturation</span>
+            <input type="range" class="channelSlider" id="saturationSlider" min="0" max="100">
+            <input type="textbox" class="channelBox" id="saturationBox" size="6">
+
+            <span class="channelLabel">Value</span>
+            <input type="range" class="channelSlider" id="valueSlider" min="0" max="100">
+            <input type="textbox" class="channelBox" id="valueBox" size="6">
 
             <span class="channelLabel">Alpha</span>
             <input type="range" class="channelSlider" id="alphaSlider" min="0" max="255">
-            <input type="textbox" class="channelBox" id="alphaBox" size="3">
+            <input type="textbox" class="channelBox" id="alphaBox" size="6">
           </div>
           <div id="colorPreview"></div>
           <fieldset>

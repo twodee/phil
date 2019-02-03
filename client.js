@@ -63,6 +63,7 @@ let history;
 
 // Color
 let rgbWidgets;
+let hsvWidgets;
 let channelsRoot;
 let colorPreview;
 let colorHistoryRoot;
@@ -1306,6 +1307,7 @@ function isOverImage(p) {
 function selectColor(rgba) {
   selectedColor = rgba;
   syncWidgetsToColor();
+  syncHsv();
 }
 
 function onMouseUp(e) {
@@ -1523,8 +1525,28 @@ function registerCallbacks() {
   ];
 
   for (let [i, widget] of rgbWidgets.entries()) {
-    initializeChannelWidgets(i, widget.slider, widget.box);
+    initializeRgbWidget(i, widget.slider, widget.box);
   }
+
+  hsvWidgets = [
+    {
+      slider: document.getElementById('hueSlider'),
+      box: document.getElementById('hueBox'),
+    },
+    {
+      slider: document.getElementById('saturationSlider'),
+      box: document.getElementById('saturationBox'),
+    },
+    {
+      slider: document.getElementById('valueSlider'),
+      box: document.getElementById('valueBox'),
+    },
+  ];
+
+  for (let [i, widget] of hsvWidgets.entries()) {
+    initializeHsvWidget(i, widget.slider, widget.box);
+  }
+  syncHsv();
 
   // Tools
   tools.pencil = document.getElementById('pencil');
@@ -1698,20 +1720,39 @@ function nameColor() {
   });
 }
 
-function syncColor() {
+function syncColorSwatch() {
   colorPreview.style['background-color'] = `rgb(${selectedColor[0]}, ${selectedColor[1]}, ${selectedColor[2]})`;
 }
 
 function syncWidgetsToColor() {
-  syncColor();
+  syncColorSwatch();
+
   for (let [i, widget] of rgbWidgets.entries()) {
     widget.slider.value = selectedColor[i];
     widget.box.value = selectedColor[i];
   }
 }
 
-function initializeChannelWidgets(i, slider, box) {
-  syncColor();
+function syncHsv() {
+  let hsv = rgbToHsv(selectedColor[0], selectedColor[1], selectedColor[2]);
+
+  // This approach yields 100 instead of 100.0.
+  let hsvRounded = [
+    Number((hsv[0] * 360).toFixed(1)),
+    Number((hsv[1] * 100).toFixed(1)),
+    Number((hsv[2] * 100).toFixed(1)),
+  ];
+
+  hsvWidgets[0].slider.value = hsvRounded[0];
+  hsvWidgets[1].slider.value = hsvRounded[1];
+  hsvWidgets[2].slider.value = hsvRounded[2];
+  hsvWidgets[0].box.value = hsvRounded[0];
+  hsvWidgets[1].box.value = hsvRounded[1];
+  hsvWidgets[2].box.value = hsvRounded[2];
+}
+
+function initializeRgbWidget(i, slider, box) {
+  syncColorSwatch();
   box.value = selectedColor[i];
   slider.value = selectedColor[i];
 
@@ -1724,10 +1765,14 @@ function initializeChannelWidgets(i, slider, box) {
       selectedColor[(i + 2) % 3] = selectedColor[i];
     }
 
-    syncColor();
+    syncColorSwatch();
 
     if (i < 3 && isShift) {
       syncWidgetsToColor();
+    }
+
+    if (i < 3) {
+      syncHsv();
     }
   });
 
@@ -1735,7 +1780,84 @@ function initializeChannelWidgets(i, slider, box) {
     if (integerPattern.test(box.value)) {
       selectedColor[i] = parseInt(box.value);
       slider.value = selectedColor[i];
-      syncColor();
+      syncColorSwatch();
+    }
+  });
+}
+
+function rgbToHsv(r, g, b) {
+  r /= 255, g /= 255, b /= 255;
+
+  var max = Math.max(r, g, b), min = Math.min(r, g, b);
+  var h, s, v = max;
+
+  var d = max - min;
+  s = max == 0 ? 0 : d / max;
+
+  if (max == min) {
+    h = 0; // achromatic
+  } else {
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  return [h, s, v];
+}
+
+function hsvToRgb(h, s, v) {
+  let r, g, b;
+
+  let i = Math.floor(h * 6);
+  let f = h * 6 - i;
+  let p = v * (1 - s);
+  let q = v * (1 - f * s);
+  let t = v * (1 - (1 - f) * s);
+
+  switch (i % 6) {
+    case 0: r = v, g = t, b = p; break;
+    case 1: r = q, g = v, b = p; break;
+    case 2: r = p, g = v, b = t; break;
+    case 3: r = p, g = q, b = v; break;
+    case 4: r = t, g = p, b = v; break;
+    case 5: r = v, g = p, b = q; break;
+  }
+
+  return [
+    Math.floor(r * 255),
+    Math.floor(g * 255),
+    Math.floor(b * 255),
+  ];
+}
+
+function syncColorToHsv() {
+  let hsv = [
+    parseFloat(hsvWidgets[0].box.value) / 360,
+    parseFloat(hsvWidgets[1].box.value) / 100,
+    parseFloat(hsvWidgets[2].box.value) / 100,
+  ];
+  let rgb = hsvToRgb(hsv[0], hsv[1], hsv[2]);
+
+  selectedColor[0] = rgb[0];
+  selectedColor[1] = rgb[1];
+  selectedColor[2] = rgb[2];
+  syncColorSwatch();
+  syncWidgetsToColor();
+}
+
+function initializeHsvWidget(i, slider, box) {
+  slider.addEventListener('input', e => {
+    box.value = slider.value;
+    syncColorToHsv();
+  });
+
+  box.addEventListener('input', () => {
+    if (isFloat(box.value)) {
+      slider.value = parseFloat(box.value);
+      syncColorToHsv();
     }
   });
 }
@@ -1867,6 +1989,10 @@ function loadImage(path, width, height, nchannels, pixels) {
   syncResizeButton();
 }
 
+function isFloat(text) {
+  return text.match(/^-?\d+(\.\d*)?$/);
+}
+
 function isInteger(text) {
   return text.match(/^-?\d+$/);
 }
@@ -1965,8 +2091,7 @@ ipcRenderer.on('update-color-history', function(event, history) {
     button.classList.add('colorHistorySwatch');
     button.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
     button.addEventListener('click', () => {
-      selectedColor = color;
-      syncWidgetsToColor();
+      selectColor(color);
     });
     colorHistoryRoot.appendChild(button);
   }
@@ -2001,8 +2126,7 @@ ipcRenderer.on('update-color-palette', function(event, palette) {
     entry.appendChild(deleter);
 
     entry.addEventListener('click', () => {
-      selectedColor = color;
-      syncWidgetsToColor();
+      selectColor(color);
     });
 
     label.addEventListener('mouseenter', () => {
