@@ -4,6 +4,96 @@ const fsdialog = require('electron').remote.dialog;
 const Dialogs = require('dialogs');
 let dialogs = Dialogs();
 
+class Color {
+  constructor() {
+    this.values = [255, 255, 255, 0];
+  }
+
+  equals(that) {
+    return this.values[0] == that.values[0] &&
+           this.values[1] == that.values[1] &&
+           this.values[2] == that.values[2] &&
+           this.values[3] == that.values[3];
+  }
+
+  set r(value) {
+    this.values[0] = value;
+  }
+
+  set g(value) {
+    this.values[1] = value;
+  }
+
+  set b(value) {
+    this.values[2] = value;
+  }
+
+  set a(value) {
+    this.values[3] = value;
+  }
+
+  get r() {
+    return this.values[0];
+  }
+
+  get g() {
+    return this.values[1];
+  }
+
+  get b() {
+    return this.values[2];
+  }
+
+  get a() {
+    return this.values[3];
+  }
+
+  toHsv() {
+    let rr = this.r / 255;
+    let gg = this.g / 255;
+    let bb = this.b / 255;
+
+    let max = Math.max(rr, gg, bb);
+    let min = Math.min(rr, gg, bb);
+    let h, s, v = max;
+
+    var d = max - min;
+    s = max == 0 ? 0 : d / max;
+
+    if (max == min) {
+      h = 0; // achromatic
+    } else {
+      switch (max) {
+        case rr: h = (gg - bb) / d + (gg < bb ? 6 : 0); break;
+        case gg: h = (bb - rr) / d + 2; break;
+        case bb: h = (rr - gg) / d + 4; break;
+      }
+      h /= 6;
+    }
+
+    return [h, s, v];
+  }
+
+  clone() {
+    let newColor = new Color();
+    newColor.r = this.r;
+    newColor.g = this.g;
+    newColor.b = this.b;
+    newColor.a = this.a;
+    return newColor;
+  }
+
+  static fromBytes(r, g, b, a) {
+    let color = new Color();
+    color.values[0] = r; 
+    color.values[1] = g; 
+    color.values[2] = b; 
+    color.values[3] = a; 
+    return color;
+  }
+}
+
+
 class DrawingMode {
 }
 DrawingMode.None = 0;
@@ -67,7 +157,7 @@ let hsvWidgets;
 let channelsRoot;
 let colorPreview;
 let colorHistoryRoot;
-let selectedColor = [0, 255, 0, 255];
+let selectedColor = Color.fromBytes(0, 0, 0, 255);
 
 let resizeButton;
 let resizeLeftBox;
@@ -409,33 +499,47 @@ class Image {
 
   set(c, r, rgb) {
     let start = (r * this.width + c) * 4;
-    this.bytes[start + 0] = rgb[0];
-    this.bytes[start + 1] = rgb[1];
-    this.bytes[start + 2] = rgb[2];
-    this.bytes[start + 3] = rgb[3];
+    this.bytes[start + 0] = rgb.r;
+    this.bytes[start + 1] = rgb.g;
+    this.bytes[start + 2] = rgb.b;
+    this.bytes[start + 3] = rgb.a;
   }
 
   get(c, r) {
     let start = (r * this.width + c) * 4;
-    return [
+    return Color.fromBytes(
       this.bytes[start + 0],
       this.bytes[start + 1],
       this.bytes[start + 2],
-      this.bytes[start + 3],
-    ];
+      this.bytes[start + 3]
+    );
   }
 
   isPixel(c, r, color) {
     let start = (r * this.width + c) * 4;
-    return this.bytes[start + 0] == color[0] &&
-           this.bytes[start + 1] == color[1] &&
-           this.bytes[start + 2] == color[2] &&
-           this.bytes[start + 3] == color[3];
+    return this.bytes[start + 0] == color.r &&
+           this.bytes[start + 1] == color.g &&
+           this.bytes[start + 2] == color.b &&
+           this.bytes[start + 3] == color.a;
+  }
+
+  replace(c, r, newColor) {
+    let oldColor = this.get(c, r);
+
+    // Walk through pixels. If pixel is oldColor, replace it.
+    for (let rr = 0; rr < this.height; ++rr) {
+      for (let cc = 0; cc < this.width; ++cc) {
+        if (this.isPixel(cc, rr, oldColor)) {
+          drawKnownPixel(new Vector2(cc, rr));
+          history.current.add(cc, rr, newColor.clone());
+        }
+      }
+    }
   }
 
   fill(c, r, color, isDiagonal = false) {
     let oldColor = this.get(c, r);
-    let newColor = color.slice(0);
+    let newColor = color.clone();
 
     // Bail if this pixel is already the fill color.
     if (this.isPixel(c, r, newColor)) {
@@ -472,9 +576,8 @@ class Image {
       }
 
       while (cc < this.width && this.isPixel(cc, rr, oldColor)) {
-        this.set(cc, rr, newColor);
         drawKnownPixel(new Vector2(cc, rr));
-        history.current.add(cc, rr, newColor.slice(0));
+        history.current.add(cc, rr, newColor.clone());
 
         if (!spanAbove && rr > 0 && this.isPixel(cc, rr - 1, oldColor)) {
           stack.push([cc, rr - 1]);
@@ -1207,7 +1310,8 @@ function objectToImage(positionObject) {
 }
 
 function setPixelToCurrentColor(p) {
-  history.current.add(p.x, p.y, selectedColor.slice(0));
+  console.log("selectedColor.values:", selectedColor.values);
+  history.current.add(p.x, p.y, selectedColor.clone());
   image.set(p.x, p.y, selectedColor);
   imageTexture.uploadPixel(p.x, p.y);
 }
@@ -1313,17 +1417,31 @@ function selectColor(rgba) {
 function onMouseUp(e) {
   // Mouse up gets called on the window to handle going offscreen. But filling
   // should only happen when the bucket is released on the canvas.
-  if (e.target == canvas && activeToolDiv == tools.bucket) {
-    mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
-    let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
-    mouseImage = objectToImage(mouseObject);
+  if (e.target == canvas) {
+    if (activeToolDiv == tools.bucket) {
+      mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
+      let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
+      mouseImage = objectToImage(mouseObject);
 
-    if (isOverImage(mouseImage)) {
-      history.begin(new UndoablePixels());
-      image.fill(mouseImage.x, mouseImage.y, selectedColor, e.shiftKey);
-      imageTexture.upload();
-      rememberColor();
-      render();
+      if (isOverImage(mouseImage)) {
+        history.begin(new UndoablePixels());
+        image.fill(mouseImage.x, mouseImage.y, selectedColor, e.shiftKey);
+        imageTexture.upload();
+        rememberColor();
+        render();
+      }
+    } else if (activeToolDiv == tools.syringe) {
+      mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
+      let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
+      mouseImage = objectToImage(mouseObject);
+
+      if (isOverImage(mouseImage)) {
+        history.begin(new UndoablePixels());
+        image.replace(mouseImage.x, mouseImage.y, selectedColor);
+        imageTexture.upload();
+        rememberColor();
+        render();
+      }
     }
   }
 
@@ -1391,6 +1509,7 @@ function syncCursor(mousePosition) {
   canvas.classList.remove('pencilHovered');
   canvas.classList.remove('bucketHovered');
   canvas.classList.remove('dropperHovered');
+  canvas.classList.remove('syringeHovered');
 
   if (mousePosition && isOverImage(mousePosition)) {
     if (activeToolDiv == tools.pencil) {
@@ -1399,6 +1518,8 @@ function syncCursor(mousePosition) {
       canvas.classList.add('bucketHovered');
     } else if (activeToolDiv == tools.dropper) {
       canvas.classList.add('dropperHovered');
+    } else if (activeToolDiv == tools.syringe) {
+      canvas.classList.add('syringeHovered');
     }
   }
 }
@@ -1552,6 +1673,7 @@ function registerCallbacks() {
   tools.pencil = document.getElementById('pencil');
   tools.dropper = document.getElementById('dropper');
   tools.bucket = document.getElementById('bucket');
+  tools.syringe = document.getElementById('syringe');
 
   activateTool(tools.pencil);
   for (let tool in tools) {
@@ -1572,6 +1694,8 @@ function registerCallbacks() {
       activateTool(tools.dropper);
     } else if (e.key == 'b') {
       activateTool(tools.bucket);
+    } else if (e.key == 's') {
+      activateTool(tools.syringe);
     } else if (e.key == '[') {
       history.undoMostRecent();
     } else if (e.key == ']') {
@@ -1709,32 +1833,32 @@ function activateTool(div) {
 }
 
 function rememberColor() {
-  ipcRenderer.send('remember-color', selectedColor);
+  ipcRenderer.send('remember-color', selectedColor.values);
 }
 
 function nameColor() {
-  let name = dialogs.prompt('What name do you give this color?', name => {
+  let name = dialogs.prompt('Name this color:', name => {
     if (name) {
-      ipcRenderer.send('name-color', name, selectedColor);
+      ipcRenderer.send('name-color', name, selectedColor.values);
     }
   });
 }
 
 function syncColorSwatch() {
-  colorPreview.style['background-color'] = `rgb(${selectedColor[0]}, ${selectedColor[1]}, ${selectedColor[2]})`;
+  colorPreview.style['background-color'] = `rgb(${selectedColor.r}, ${selectedColor.g}, ${selectedColor.b})`;
 }
 
 function syncWidgetsToColor() {
   syncColorSwatch();
 
   for (let [i, widget] of rgbWidgets.entries()) {
-    widget.slider.value = selectedColor[i];
-    widget.box.value = selectedColor[i];
+    widget.slider.value = selectedColor.values[i];
+    widget.box.value = selectedColor.values[i];
   }
 }
 
 function syncHsv() {
-  let hsv = rgbToHsv(selectedColor[0], selectedColor[1], selectedColor[2]);
+  let hsv = selectedColor.toHsv();
 
   // This approach yields 100 instead of 100.0.
   let hsvRounded = [
@@ -1753,16 +1877,16 @@ function syncHsv() {
 
 function initializeRgbWidget(i, slider, box) {
   syncColorSwatch();
-  box.value = selectedColor[i];
-  slider.value = selectedColor[i];
+  box.value = selectedColor.values[i];
+  slider.value = selectedColor.values[i];
 
   slider.addEventListener('input', e => {
-    selectedColor[i] = parseInt(slider.value);
-    box.value = selectedColor[i];
+    selectedColor.values[i] = parseInt(slider.value);
+    box.value = selectedColor.values[i];
 
     if (i < 3 && isShift) {
-      selectedColor[(i + 1) % 3] = selectedColor[i];
-      selectedColor[(i + 2) % 3] = selectedColor[i];
+      selectedColor.values[(i + 1) % 3] = selectedColor.values[i];
+      selectedColor.values[(i + 2) % 3] = selectedColor.values[i];
     }
 
     syncColorSwatch();
@@ -1778,34 +1902,11 @@ function initializeRgbWidget(i, slider, box) {
 
   box.addEventListener('input', () => {
     if (integerPattern.test(box.value)) {
-      selectedColor[i] = parseInt(box.value);
-      slider.value = selectedColor[i];
+      selectedColor.values[i] = parseInt(box.value);
+      slider.value = selectedColor.values[i];
       syncColorSwatch();
     }
   });
-}
-
-function rgbToHsv(r, g, b) {
-  r /= 255, g /= 255, b /= 255;
-
-  var max = Math.max(r, g, b), min = Math.min(r, g, b);
-  var h, s, v = max;
-
-  var d = max - min;
-  s = max == 0 ? 0 : d / max;
-
-  if (max == min) {
-    h = 0; // achromatic
-  } else {
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-
-  return [h, s, v];
 }
 
 function hsvToRgb(h, s, v) {
@@ -1841,9 +1942,9 @@ function syncColorToHsv() {
   ];
   let rgb = hsvToRgb(hsv[0], hsv[1], hsv[2]);
 
-  selectedColor[0] = rgb[0];
-  selectedColor[1] = rgb[1];
-  selectedColor[2] = rgb[2];
+  selectedColor.r = rgb[0];
+  selectedColor.g = rgb[1];
+  selectedColor.b = rgb[2];
   syncColorSwatch();
   syncWidgetsToColor();
 }

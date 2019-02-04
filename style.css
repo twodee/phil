@@ -64,6 +64,10 @@ body {
   cursor: auto;
 }
 
+#canvas.syringeHovered {
+  cursor: url(images/syringe.png) 6 21, crosshair;
+}
+
 #canvas.pencilHovered {
   cursor: url(images/pencil.png) 6 21, crosshair;
 }
