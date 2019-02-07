@@ -118,21 +118,7 @@ body {
 .channelBox {
 }
 
-#rotationalMirroringRoot {
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-column-gap: 5px;
-  grid-row-gap: 5px;
-}
-
-#arrayTilingRoot {
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-column-gap: 5px;
-  grid-row-gap: 5px;
-}
-
-#gridRoot {
+.settingsRoot {
   display: grid;
   grid-template-columns: auto auto;
   grid-column-gap: 5px;
@@ -232,10 +218,6 @@ body {
   grid-row: 2;
 }
 
-#sizePanelBody {
-  text-align: center;
-}
-
 #colorHistoryRoot {
   margin-top: 10px;
 }
@@ -290,6 +272,7 @@ fieldset {
 
 legend {
   font-size: 80%;
+  font-style: italic;
 }
 
 .autoDrawOptions {
@@ -314,4 +297,12 @@ input[type="radio"], input[type="checkbox"] {
 
 .error {
   background-color: pink;
+}
+
+.rightward {
+  text-align: right;
+}
+
+.applyButton {
+  margin-top: 1em;
 }

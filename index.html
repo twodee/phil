@@ -31,7 +31,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader open">Color</div>
+        <div class="panelHeader">Color</div>
         <div class="panelBody">
           <div id="channelsRoot">
             <span class="channelLabel">Red</span>
@@ -84,7 +84,7 @@
           </div>
           <div class="autoDrawSection">
             <label><input type="radio" id="autoDrawRotationalMirroringButton" name="autoDraw">Rotational mirroring</label>
-            <div id="rotationalMirroringRoot" class="autoDrawOptions">
+            <div class="autoDrawOptions settingsRoot">
               <span>Wedge count</span>
               <input type="number" value="2" min="2" id="wedgeCountBox">
               <span>Rotation offset</span>
@@ -93,7 +93,7 @@
           </div>
           <div class="autoDrawSection">
             <label><input type="radio" id="autoDrawArrayTilingButton" name="autoDraw">Array tiling</label>
-            <div id="arrayTilingRoot" class="autoDrawOptions">
+            <div class="autoDrawOptions settingsRoot">
               <span>Tile width</span>
               <input type="number" value="32" min="1" id="tileWidthBox">
               <span>Tile height</span>
@@ -106,7 +106,7 @@
       <div class="panel">
         <div class="panelHeader">Grid</div>
         <div class="panelBody">
-          <div id="gridRoot">
+          <div class="settingsRoot">
             <label class="span2"><input type="checkbox" id="isGridShownBox"><span>Show grid</span></label>
             <span>Cell width</span>
             <input type="number" value="5" min="1" id="gridCellWidthBox">
@@ -125,15 +125,33 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Size</div>
-        <div class="panelBody" id="sizePanelBody">
-          <div id="resizeOffsets">
-            <input type="text" size="4" tabindex="1" placeholder="top" id="resizeTopBox">
-            <input type="text" size="4" tabindex="3" placeholder="right" id="resizeRightBox">
-            <input type="text" size="4" tabindex="4" placeholder="bottom" id="resizeBottomBox">
-            <input type="text" size="4" tabindex="2" placeholder="left" id="resizeLeftBox">
-          </div>
-          <button id="resizeButton"></button>
+        <div class="panelHeader open">Canvas</div>
+        <div class="panelBody">
+          <fieldset>
+            <legend>Add/Remove Margins</legend>
+            <div id="resizeOffsets">
+              <input type="text" size="4" tabindex="1" placeholder="top" id="resizeTopBox">
+              <input type="text" size="4" tabindex="3" placeholder="right" id="resizeRightBox">
+              <input type="text" size="4" tabindex="4" placeholder="bottom" id="resizeBottomBox">
+              <input type="text" size="4" tabindex="2" placeholder="left" id="resizeLeftBox">
+            </div>
+            <div class="rightward">
+              <button id="resizeButton" class="applyButton"></button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Shift-wrap</legend>
+            <div class="settingsRoot">
+              <span>Horizontal shift</span>
+              <input type="number" value="0" id="horizontalShiftWrapBox">
+              <span>Vertical shift</span>
+              <input type="number" value="0" id="verticalShiftWrapBox">
+            </div>
+            <div class="rightward">
+              <button id="shiftWrapButton" class="applyButton">Shift-wrap</button>
+            </div>
+          </fieldset>
         </div>
       </div>
     </div>

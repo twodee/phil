@@ -91,6 +91,15 @@ class Color {
     color.values[3] = a; 
     return color;
   }
+
+  static fromByteArray(rgba) {
+    let color = new Color();
+    color.values[0] = rgba[0]; 
+    color.values[1] = rgba[1]; 
+    color.values[2] = rgba[2]; 
+    color.values[3] = rgba[3]; 
+    return color;
+  }
 }
 
 
@@ -158,6 +167,10 @@ let channelsRoot;
 let colorPreview;
 let colorHistoryRoot;
 let selectedColor = Color.fromBytes(0, 0, 0, 255);
+
+let shiftWrapButton;
+let horizontalShiftWrapBox;
+let verticalShiftWrapBox;
 
 let resizeButton;
 let resizeLeftBox;
@@ -668,6 +681,20 @@ class Image {
     this.bytes = Buffer.alloc(newWidth * newHeight * 4, 255);
     this.size[0] = newWidth;
     this.size[1] = newHeight;
+  }
+
+  shiftWrap(dc, dr) {
+    let newBytes = Buffer.alloc(this.width * this.height * 4, 255);
+    for (let r = 0; r < this.height; ++r) {
+      for (let c = 0; c < this.width; ++c) {
+        let rr = (r + dr) % this.height;
+        let cc = (c + dc) % this.width;
+        let iOld = 4 * (r * this.width + c);
+        let iNew = 4 * (rr * this.width + cc);
+        this.bytes.copy(newBytes, iNew, iOld, iOld + 4);
+      }
+    }
+    this.bytes = newBytes;
   }
 
   resizeDelta(t, r, b, l) {
@@ -1547,6 +1574,9 @@ function onReady() {
   resizeRightBox = document.getElementById('resizeRightBox');
   resizeTopBox = document.getElementById('resizeTopBox');
   resizeBottomBox = document.getElementById('resizeBottomBox');
+  shiftWrapButton = document.getElementById('shiftWrapButton');
+  horizontalShiftWrapBox = document.getElementById('horizontalShiftWrapBox');
+  verticalShiftWrapBox = document.getElementById('verticalShiftWrapBox');
   pixelCoordinatesBox = document.getElementById('pixelCoordinatesBox');
   autoDrawNoneButton = document.getElementById('autoDrawNoneButton');
   autoDrawRotationalMirroringButton = document.getElementById('autoDrawRotationalMirroringButton');
@@ -1711,6 +1741,20 @@ function registerCallbacks() {
     }
   });
   
+  shiftWrapButton.addEventListener('click', () => {
+    let dc = parseInt(horizontalShiftWrapBox.value);
+    let dr = parseInt(verticalShiftWrapBox.value);
+
+    history.begin(new UndoableImage());
+    image.shiftWrap(dc, dr);
+
+    imageTexture.upload();
+    render();
+
+    history.current.newImage = image.clone();
+    history.commit();
+  });
+
   resizeButton.addEventListener('click', () => {
     let l = parseInt(resizeLeftBox.value);
     let r = parseInt(resizeRightBox.value);
@@ -2011,7 +2055,7 @@ function render() {
     }
 
     if (isGridShown) {
-      gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.0, 1.0);
+      gl.uniform4f(linesColorUniform, 1.0, 1.0, 1.0, 1.0);
       gl.bindVertexArray(gridVao);
       gl.drawArrays(gl.LINES, 0, gridLineCount * 2);
     }
@@ -2187,10 +2231,10 @@ ipcRenderer.on('update-color-history', function(event, history) {
   }
 
   for (let i = history.length - 1; i >= 0; --i) {
-    let color = history[i].color;
+    let color = Color.fromByteArray(history[i].color);
     let button = document.createElement('div');
     button.classList.add('colorHistorySwatch');
-    button.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    button.style['background-color'] = `rgb(${color.r}, ${color.g}, ${color.b})`;
     button.addEventListener('click', () => {
       selectColor(color);
     });
@@ -2205,11 +2249,12 @@ ipcRenderer.on('update-color-palette', function(event, palette) {
 
   for (let i = palette.length - 1; i >= 0; --i) {
     let {name, color} = palette[i];
+    color = Color.fromByteArray(color);
 
     let swatch = document.createElement('div');
     swatch.classList.add('colorPaletteSwatch');
     swatch.classList.add('column0');
-    swatch.style['background-color'] = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    swatch.style['background-color'] = `rgb(${color.r}, ${color.g}, ${color.b})`;
 
     let label = document.createElement('span');
     label.classList.add('column1');
