@@ -48,6 +48,7 @@ class Color {
     return this.values[3];
   }
 
+  // https://gist.github.com/mjackson/5311256
   toHsv() {
     let rr = this.r / 255;
     let gg = this.g / 255;
@@ -693,8 +694,8 @@ class Image {
     let newBytes = Buffer.alloc(this.width * this.height * 4, 255);
     for (let r = 0; r < this.height; ++r) {
       for (let c = 0; c < this.width; ++c) {
-        let rr = (r + dr) % this.height;
-        let cc = (c + dc) % this.width;
+        let rr = ((r + dr) % this.height + this.height) % this.height;
+        let cc = ((c + dc) % this.width + this.width) % this.width;
         let iOld = 4 * (r * this.width + c);
         let iNew = 4 * (rr * this.width + cc);
         this.bytes.copy(newBytes, iNew, iOld, iOld + 4);
