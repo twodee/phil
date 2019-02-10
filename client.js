@@ -734,6 +734,58 @@ class Image {
       }
     }
   }
+
+  isRow(r, color) {
+    for (let c = 0; c < this.width; ++c) {
+      if (!this.isPixel(c, r, color)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  isColumn(c, color) {
+    for (let r = 0; r < this.height; ++r) {
+      if (!this.isPixel(c, r, color)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  autocrop(backgroundColor) {
+    let l = 0;
+    let r = this.width - 1;
+    let t = 0;
+    let b = this.height - 1;
+
+    while (l < this.width && this.isColumn(l, backgroundColor)) {
+      console.log("hi");
+      ++l;
+    }
+    
+    if (l == this.width) {
+      console.log("all blank");
+      return;
+    }
+
+    while (r >= 0 && this.isColumn(r, backgroundColor)) {
+      --r;
+    }
+
+    while (t < this.height && this.isRow(t, backgroundColor)) {
+      ++t;
+    }
+
+    while (b >= 0 && this.isRow(b, backgroundColor)) {
+      --b;
+    }
+
+    r = this.width - 1 - r;
+    b = this.height - 1 - b;
+
+    this.extract(t, r, b, l);
+  }
 }
 
 class Texture {
@@ -1905,6 +1957,22 @@ function registerCallbacks() {
     history.current.newImage = image.clone();
     history.commit();
   })
+
+  let autocropButton = document.getElementById('autocropButton');
+  autocropButton.addEventListener('click', e => {
+    history.begin(new UndoableImage());
+    image.autocrop(backgroundColor);
+
+    updateArrayTilingGrid();
+    updateGrid();
+
+    imageTexture.upload();
+    updateProjection();
+    render();
+
+    history.current.newImage = image.clone();
+    history.commit();
+  });
 }
 
 function updateBackgroundColorPreview() {
