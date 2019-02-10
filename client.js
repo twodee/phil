@@ -83,6 +83,10 @@ class Color {
     return newColor;
   }
 
+  toString() {
+    return `[${this.r} ${this.g} ${this.b} ${this.a}]`;
+  }
+
   static fromBytes(r, g, b, a) {
     let color = new Color();
     color.values[0] = r; 
@@ -165,8 +169,10 @@ let rgbWidgets;
 let hsvWidgets;
 let channelsRoot;
 let colorPreview;
+let backgroundColorPreview;
 let colorHistoryRoot;
 let selectedColor = Color.fromBytes(0, 0, 0, 255);
+let backgroundColor = Color.fromBytes(255, 255, 255, 0);
 
 let shiftWrapButton;
 let horizontalShiftWrapBox;
@@ -711,6 +717,22 @@ class Image {
       b > 0 ? b : 0,
       l > 0 ? l : 0
     );
+  }
+
+  outline4(backgroundColor, outlineColor) {
+    let originalImage = this.clone();
+
+    for (let r = 0; r < this.height; ++r) {
+      for (let c = 0; c < this.width; ++c) {
+        if (originalImage.isPixel(c, r, backgroundColor) &&
+            ((r > 0 && !originalImage.isPixel(c, r - 1, backgroundColor) && !originalImage.isPixel(c, r - 1, outlineColor)) ||
+             (r < this.height - 1 && !originalImage.isPixel(c, r + 1, backgroundColor) && !originalImage.isPixel(c, r + 1, outlineColor)) ||
+             (c > 0 && !originalImage.isPixel(c - 1, r, backgroundColor) && !originalImage.isPixel(c - 1, r, outlineColor)) ||
+             (c < this.width - 1 && !originalImage.isPixel(c + 1, r, backgroundColor) && !originalImage.isPixel(c + 1, r, outlineColor)))) {
+          this.set(c, r, outlineColor);
+        }
+      }
+    }
   }
 }
 
@@ -1337,7 +1359,6 @@ function objectToImage(positionObject) {
 }
 
 function setPixelToCurrentColor(p) {
-  console.log("selectedColor.values:", selectedColor.values);
   history.current.add(p.x, p.y, selectedColor.clone());
   image.set(p.x, p.y, selectedColor);
   imageTexture.uploadPixel(p.x, p.y);
@@ -1568,6 +1589,8 @@ function onReady() {
   undosList = document.getElementById('undosList');
   channelsRoot = document.getElementById('channelsRoot');
   colorPreview = document.getElementById('colorPreview');
+  backgroundColorPreview = document.getElementById('backgroundColorPreview');
+  setBackgroundColorButton = document.getElementById('setBackgroundColorButton');
   colorHistoryRoot = document.getElementById('colorHistoryRoot');
   resizeButton = document.getElementById('resizeButton');
   resizeLeftBox = document.getElementById('resizeLeftBox');
@@ -1634,6 +1657,8 @@ function syncWidgets() {
   gridCellWidthBox.value = gridCellSize.x;
   gridCellHeightBox.value = gridCellSize.y;
   isGridShownBox.checked = isGridShown;
+
+  updateBackgroundColorPreview();
 }
 
 function assertIntegerGreaterThan(input, minimum, action) {
@@ -1815,6 +1840,11 @@ function registerCallbacks() {
     render();
   });
 
+  setBackgroundColorButton.addEventListener('click', () => {
+    backgroundColor = selectedColor.clone();
+    updateBackgroundColorPreview();
+  });
+
   wedgeCountBox.addEventListener('input', e => {
     assertIntegerGreaterThan(wedgeCountBox, 1, value => {
       wedgeCount = value;
@@ -1865,6 +1895,20 @@ function registerCallbacks() {
     isGridShown = isGridShownBox.checked;
     render();
   });
+
+  let outlineFourButton = document.getElementById('outlineFourButton');
+  outlineFourButton.addEventListener('click', e => {
+    history.begin(new UndoableImage());
+    image.outline4(backgroundColor, selectedColor);
+    imageTexture.upload();
+    render();
+    history.current.newImage = image.clone();
+    history.commit();
+  })
+}
+
+function updateBackgroundColorPreview() {
+  backgroundColorPreview.style['background-color'] = `rgb(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b})`;
 }
 
 function activateTool(div) {

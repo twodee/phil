@@ -222,7 +222,7 @@ body {
   margin-top: 10px;
 }
 
-#colorPreview {
+#colorPreview, #backgroundColorPreview {
   height: 30px;
 }
 

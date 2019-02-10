@@ -64,6 +64,11 @@
           </div>
           <div id="colorPreview"></div>
           <fieldset>
+            <legend>Background</legend>
+            <div id="backgroundColorPreview"></div>
+            <button id="setBackgroundColorButton" class="applyButton">Set Background Color</button>
+          </fieldset>
+          <fieldset>
             <legend>Recent colors</legend>
             <div id="colorHistoryRoot"></div>
           </fieldset>
@@ -117,6 +122,16 @@
       </div>
 
       <div class="panel">
+        <div class="panelHeader">Effects</div>
+        <div class="panelBody">
+          <fieldset>
+            <legend>Outline</legend>
+            <button id="outlineFourButton">Outline 4-Neighbors</button>
+          </fieldset>
+        </div>
+      </div>
+
+      <div class="panel">
         <div class="panelHeader">Undo</div>
         <div class="panelBody">
           <div id="undosList">
@@ -125,7 +140,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader open">Canvas</div>
+        <div class="panelHeader">Canvas</div>
         <div class="panelBody">
           <fieldset>
             <legend>Add/Remove Margins</legend>
@@ -151,6 +166,12 @@
             <div class="rightward">
               <button id="shiftWrapButton" class="applyButton">Shift-wrap</button>
             </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Flip</legend>
+            <button id="flipLeftRight" class="applyButton">Flip Left to Right</button>
+            <button id="flipTopBottom" class="applyButton">Flip Top to Bottom</button>
           </fieldset>
         </div>
       </div>
