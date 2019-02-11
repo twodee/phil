@@ -551,7 +551,7 @@ class Image {
     for (let rr = 0; rr < this.height; ++rr) {
       for (let cc = 0; cc < this.width; ++cc) {
         if (this.isPixel(cc, rr, oldColor)) {
-          drawKnownPixel(new Vector2(cc, rr));
+          drawKnownPixel(new Vector2(cc, rr), color);
           history.current.add(cc, rr, newColor.clone());
         }
       }
@@ -597,7 +597,7 @@ class Image {
       }
 
       while (cc < this.width && this.isPixel(cc, rr, oldColor)) {
-        drawKnownPixel(new Vector2(cc, rr));
+        drawKnownPixel(new Vector2(cc, rr), color);
         history.current.add(cc, rr, newColor.clone());
 
         if (!spanAbove && rr > 0 && this.isPixel(cc, rr - 1, oldColor)) {
@@ -1833,6 +1833,8 @@ function registerCallbacks() {
       history.undoMostRecent();
     } else if (e.key == ']') {
       history.redoMostRecent();
+    } else if (e.key == 'Shift') {
+      isShift = true;
     } else if (e.key == 'z' && pendingTool == null) {
       hotDrop(mouseImage);
       pendingTool = activeToolDiv;

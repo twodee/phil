@@ -81,7 +81,7 @@ body {
 }
 
 #canvas.eraserHovered {
-  cursor: url(images/eraser.png) 7 20, crosshair;
+  cursor: url(images/eraser.png) 13 13, crosshair;
 }
 
 .panelHeader {
