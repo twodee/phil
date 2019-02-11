@@ -27,6 +27,7 @@ function createMenu() {
             dialog.showOpenDialog({
               title: 'Open...',
             }, function(path) {
+              loadImage({ path: path, sharp: sharp(path.toString()) });
             });
           },
         },

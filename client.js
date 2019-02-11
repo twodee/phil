@@ -157,6 +157,7 @@ let tileHeightBox;
 
 // Tools
 let activeToolDiv;
+let pendingTool = null;
 let tools = {};
 let pixelCoordinatesBox;
 let drawingMode;
@@ -1550,6 +1551,12 @@ function onMouseUp(e) {
   lockAxis = null;
 }
 
+function hotDrop(p) {
+  if (isOverImage(p)) {
+    selectColor(image.get(p.x, p.y));
+  }
+}
+
 function onMouseMove(e) {
   if (!image) {
     pixelCoordinatesBox.innerText = `-`;
@@ -1560,6 +1567,10 @@ function onMouseMove(e) {
   let newMouseObject = screenToObject(newMouseScreen.x, newMouseScreen.y);
   let newMouseImage = objectToImage(newMouseObject);
   pixelCoordinatesBox.innerText = `${newMouseImage.x}, ${newMouseImage.y}`;
+
+  if (activeToolDiv == tools.dropper && pendingTool != null) {
+    hotDrop(newMouseImage);
+  }
 
   if (lockAxis == null && mouseImage && !newMouseImage.equals(mouseImage) && e.shiftKey) {
     let diff = newMouseScreen.subtract(mouseScreen).abs();
@@ -1796,6 +1807,7 @@ function registerCallbacks() {
   window.addEventListener('mouseup', onMouseUp);
 
   window.addEventListener('keydown', e => {
+    console.log("e.key:", e.key);
     if (e.key == 'p') {
       activateTool(tools.pencil);
     } else if (e.key == 'e') {
@@ -1808,14 +1820,19 @@ function registerCallbacks() {
       history.undoMostRecent();
     } else if (e.key == ']') {
       history.redoMostRecent();
-    } else if (e.key == 'Shift') {
-      isShift = true;
+    } else if (e.key == 'z' && pendingTool == null) {
+      hotDrop(mouseImage);
+      pendingTool = activeToolDiv;
+      activateTool(tools.dropper);
     }
   });
 
   window.addEventListener('keyup', e => {
     if (e.key == 'Shift') {
       isShift = false;
+    } else if (e.key == 'z') {
+      activateTool(pendingTool);
+      pendingTool = null;
     }
   });
   
