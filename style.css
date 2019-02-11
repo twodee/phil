@@ -80,6 +80,10 @@ body {
   cursor: url(images/dropper.png) 7 20, crosshair;
 }
 
+#canvas.eraserHovered {
+  cursor: url(images/eraser.png) 7 20, crosshair;
+}
+
 .panelHeader {
   font-family: sans-serif;
   margin-bottom: 1em;

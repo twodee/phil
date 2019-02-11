@@ -173,7 +173,7 @@ let channelsRoot;
 let colorPreview;
 let backgroundColorPreview;
 let colorHistoryRoot;
-let selectedColor = Color.fromBytes(0, 0, 0, 255);
+let foregroundColor = Color.fromBytes(0, 0, 0, 255);
 let backgroundColor = Color.fromBytes(255, 255, 255, 0);
 
 let shiftWrapButton;
@@ -1412,19 +1412,19 @@ function objectToImage(positionObject) {
   return positionImage;
 }
 
-function setPixelToCurrentColor(p) {
-  history.current.add(p.x, p.y, selectedColor.clone());
-  image.set(p.x, p.y, selectedColor);
+function setPixelToColor(p, color) {
+  history.current.add(p.x, p.y, color.clone());
+  image.set(p.x, p.y, color);
   imageTexture.uploadPixel(p.x, p.y);
 }
 
-function drawKnownPixel(p) {
+function drawKnownPixel(p, color) {
   if (drawingMode == DrawingMode.None) {
-    setPixelToCurrentColor(p);
+    setPixelToColor(p, color);
   } else if (drawingMode == DrawingMode.ArrayTiling) {
     for (let r = p.y % tileSize.y; r < image.height; r += tileSize.y) {
       for (let c = p.x % tileSize.x; c < image.width; c += tileSize.x) {
-        setPixelToCurrentColor(new Vector2(c, r));
+        setPixelToColor(new Vector2(c, r), color);
       }
     }
   } else if (drawingMode == DrawingMode.RotationalMirroring) {
@@ -1462,25 +1462,24 @@ function drawKnownPixel(p) {
 
       let pp = new Vector2(radius * Math.cos(phi), radius * Math.sin(phi)).add(middle).round();
       if (image.containsPixel(pp)) {
-        setPixelToCurrentColor(pp);
+        setPixelToColor(pp, color);
       }
     }
   }
 }
 
-function drawPixel(p) {
+function drawPixel(p, color) {
   if (image.containsPixel(p)) {
-    rememberColor();
-    drawKnownPixel(p);
+    drawKnownPixel(p, color);
   }
 }
 
-function drawLine(from, to) {
+function drawLine(from, to, color) {
   let n = Vector2.diagonalDistance(from, to);
   for (let step = 0; step <= n; step += 1) {
     let t = n == 0 ? 0.0 : step / n;
     let p = Vector2.lerp(from, to, t).round(); 
-    drawPixel(p);
+    drawPixel(p, color);
   }
 }
 
@@ -1491,10 +1490,15 @@ function onMouseDown(e) {
 
   if (e.which == 1) {
     if (activeToolDiv == tools.pencil) {
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, imageTexture.textureId);
+      rememberColor();
       history.begin(new UndoablePixels());
-      drawPixel(mouseImage);
+      drawPixel(mouseImage, foregroundColor);
+      render();
+    }
+
+    else if (activeToolDiv == tools.eraser) {
+      history.begin(new UndoablePixels());
+      drawPixel(mouseImage, backgroundColor);
       render();
     }
     
@@ -1511,7 +1515,7 @@ function isOverImage(p) {
 }
 
 function selectColor(rgba) {
-  selectedColor = rgba;
+  foregroundColor = rgba;
   syncWidgetsToColor();
   syncHsv();
 }
@@ -1527,7 +1531,7 @@ function onMouseUp(e) {
 
       if (isOverImage(mouseImage)) {
         history.begin(new UndoablePixels());
-        image.fill(mouseImage.x, mouseImage.y, selectedColor, e.shiftKey);
+        image.fill(mouseImage.x, mouseImage.y, foregroundColor, e.shiftKey);
         imageTexture.upload();
         rememberColor();
         render();
@@ -1539,7 +1543,7 @@ function onMouseUp(e) {
 
       if (isOverImage(mouseImage)) {
         history.begin(new UndoablePixels());
-        image.replace(mouseImage.x, mouseImage.y, selectedColor);
+        image.replace(mouseImage.x, mouseImage.y, foregroundColor);
         imageTexture.upload();
         rememberColor();
         render();
@@ -1593,9 +1597,12 @@ function onMouseMove(e) {
 
   if (e.which == 1) {
     if (activeToolDiv == tools.pencil) {
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, imageTexture.textureId);
-      drawLine(mouseImage, newMouseImage);
+      drawLine(mouseImage, newMouseImage, foregroundColor);
+      render();
+    }
+
+    else if (activeToolDiv == tools.eraser) {
+      drawLine(mouseImage, newMouseImage, backgroundColor);
       render();
     }
 
@@ -1622,6 +1629,7 @@ function syncCursor(mousePosition) {
   canvas.classList.remove('bucketHovered');
   canvas.classList.remove('dropperHovered');
   canvas.classList.remove('syringeHovered');
+  canvas.classList.remove('eraserHovered');
 
   if (mousePosition && isOverImage(mousePosition)) {
     if (activeToolDiv == tools.pencil) {
@@ -1632,6 +1640,8 @@ function syncCursor(mousePosition) {
       canvas.classList.add('dropperHovered');
     } else if (activeToolDiv == tools.syringe) {
       canvas.classList.add('syringeHovered');
+    } else if (activeToolDiv == tools.eraser) {
+      canvas.classList.add('eraserHovered');
     }
   }
 }
@@ -1793,6 +1803,7 @@ function registerCallbacks() {
   tools.dropper = document.getElementById('dropper');
   tools.bucket = document.getElementById('bucket');
   tools.syringe = document.getElementById('syringe');
+  tools.eraser = document.getElementById('eraser');
 
   activateTool(tools.pencil);
   for (let tool in tools) {
@@ -1810,12 +1821,14 @@ function registerCallbacks() {
     console.log("e.key:", e.key);
     if (e.key == 'p') {
       activateTool(tools.pencil);
-    } else if (e.key == 'e') {
+    } else if (e.key == 'd') {
       activateTool(tools.dropper);
     } else if (e.key == 'b') {
       activateTool(tools.bucket);
     } else if (e.key == 's') {
       activateTool(tools.syringe);
+    } else if (e.key == 'e') {
+      activateTool(tools.eraser);
     } else if (e.key == '[') {
       history.undoMostRecent();
     } else if (e.key == ']') {
@@ -1911,7 +1924,7 @@ function registerCallbacks() {
   });
 
   setBackgroundColorButton.addEventListener('click', () => {
-    backgroundColor = selectedColor.clone();
+    backgroundColor = foregroundColor.clone();
     updateBackgroundColorPreview();
   });
 
@@ -1969,7 +1982,7 @@ function registerCallbacks() {
   let outlineFourButton = document.getElementById('outlineFourButton');
   outlineFourButton.addEventListener('click', e => {
     history.begin(new UndoableImage());
-    image.outline4(backgroundColor, selectedColor);
+    image.outline4(backgroundColor, foregroundColor);
     imageTexture.upload();
     render();
     history.current.newImage = image.clone();
@@ -2007,32 +2020,32 @@ function activateTool(div) {
 }
 
 function rememberColor() {
-  ipcRenderer.send('remember-color', selectedColor.values);
+  ipcRenderer.send('remember-color', foregroundColor.values);
 }
 
 function nameColor() {
   let name = dialogs.prompt('Name this color:', name => {
     if (name) {
-      ipcRenderer.send('name-color', name, selectedColor.values);
+      ipcRenderer.send('name-color', name, foregroundColor.values);
     }
   });
 }
 
 function syncColorSwatch() {
-  colorPreview.style['background-color'] = `rgb(${selectedColor.r}, ${selectedColor.g}, ${selectedColor.b})`;
+  colorPreview.style['background-color'] = `rgb(${foregroundColor.r}, ${foregroundColor.g}, ${foregroundColor.b})`;
 }
 
 function syncWidgetsToColor() {
   syncColorSwatch();
 
   for (let [i, widget] of rgbWidgets.entries()) {
-    widget.slider.value = selectedColor.values[i];
-    widget.box.value = selectedColor.values[i];
+    widget.slider.value = foregroundColor.values[i];
+    widget.box.value = foregroundColor.values[i];
   }
 }
 
 function syncHsv() {
-  let hsv = selectedColor.toHsv();
+  let hsv = foregroundColor.toHsv();
 
   // This approach yields 100 instead of 100.0.
   let hsvRounded = [
@@ -2051,16 +2064,16 @@ function syncHsv() {
 
 function initializeRgbWidget(i, slider, box) {
   syncColorSwatch();
-  box.value = selectedColor.values[i];
-  slider.value = selectedColor.values[i];
+  box.value = foregroundColor.values[i];
+  slider.value = foregroundColor.values[i];
 
   slider.addEventListener('input', e => {
-    selectedColor.values[i] = parseInt(slider.value);
-    box.value = selectedColor.values[i];
+    foregroundColor.values[i] = parseInt(slider.value);
+    box.value = foregroundColor.values[i];
 
     if (i < 3 && isShift) {
-      selectedColor.values[(i + 1) % 3] = selectedColor.values[i];
-      selectedColor.values[(i + 2) % 3] = selectedColor.values[i];
+      foregroundColor.values[(i + 1) % 3] = foregroundColor.values[i];
+      foregroundColor.values[(i + 2) % 3] = foregroundColor.values[i];
     }
 
     syncColorSwatch();
@@ -2076,8 +2089,8 @@ function initializeRgbWidget(i, slider, box) {
 
   box.addEventListener('input', () => {
     if (integerPattern.test(box.value)) {
-      selectedColor.values[i] = parseInt(box.value);
-      slider.value = selectedColor.values[i];
+      foregroundColor.values[i] = parseInt(box.value);
+      slider.value = foregroundColor.values[i];
       syncColorSwatch();
     }
   });
@@ -2116,9 +2129,9 @@ function syncColorToHsv() {
   ];
   let rgb = hsvToRgb(hsv[0], hsv[1], hsv[2]);
 
-  selectedColor.r = rgb[0];
-  selectedColor.g = rgb[1];
-  selectedColor.b = rgb[2];
+  foregroundColor.r = rgb[0];
+  foregroundColor.g = rgb[1];
+  foregroundColor.b = rgb[2];
   syncColorSwatch();
   syncWidgetsToColor();
 }
