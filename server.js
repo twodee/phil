@@ -218,7 +218,6 @@ app.on('ready', () => {
 
   createMenu();
   preferencesPath = require('os').homedir() + '/.phil.json';
-  console.log("preferencesPath:", preferencesPath);
 
   if (fs.existsSync(preferencesPath)) {
     fs.readFile(preferencesPath, 'utf8', (error, data) => {
@@ -228,7 +227,6 @@ app.on('ready', () => {
         let preferences = JSON.parse(data);
         if (preferences.hasOwnProperty('colorPalette')) {
           colorPalette = preferences.colorPalette;
-          console.log("colorPalette:", colorPalette);
         }
       }
       createWindow();
@@ -247,7 +245,6 @@ app.on('will-quit', () => {
     colorPalette: colorPalette,
   };
   let json = JSON.stringify(prefs, null, 2);
-  console.log("json:", json);
   fs.writeFileSync(preferencesPath, json, 'utf8');
 });
 
