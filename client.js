@@ -687,8 +687,8 @@ class Image {
 
   resize(newWidth, newHeight) {
     this.bytes = Buffer.alloc(newWidth * newHeight * 4, 255);
-    this.size[0] = newWidth;
-    this.size[1] = newHeight;
+    this.width = newWidth;
+    this.height = newHeight;
   }
 
   shiftWrap(dc, dr) {
@@ -762,12 +762,10 @@ class Image {
     let b = this.height - 1;
 
     while (l < this.width && this.isColumn(l, backgroundColor)) {
-      console.log("hi");
       ++l;
     }
     
     if (l == this.width) {
-      console.log("all blank");
       return;
     }
 
@@ -1664,7 +1662,6 @@ function onReady() {
   channelsRoot = document.getElementById('channelsRoot');
   colorPreview = document.getElementById('colorPreview');
   backgroundColorPreview = document.getElementById('backgroundColorPreview');
-  setBackgroundColorButton = document.getElementById('setBackgroundColorButton');
   colorHistoryRoot = document.getElementById('colorHistoryRoot');
   resizeButton = document.getElementById('resizeButton');
   resizeLeftBox = document.getElementById('resizeLeftBox');
@@ -1818,7 +1815,6 @@ function registerCallbacks() {
   window.addEventListener('mouseup', onMouseUp);
 
   window.addEventListener('keydown', e => {
-    console.log("e.key:", e.key);
     if (e.key == 'p') {
       activateTool(tools.pencil);
     } else if (e.key == 'd') {
@@ -1925,9 +1921,15 @@ function registerCallbacks() {
     render();
   });
 
-  setBackgroundColorButton.addEventListener('click', () => {
+  let foregroundToBackgroundButton = document.getElementById('foregroundToBackgroundButton');
+  foregroundToBackgroundButton.addEventListener('click', () => {
     backgroundColor = foregroundColor.clone();
     updateBackgroundColorPreview();
+  });
+
+  let backgroundToForegroundButton = document.getElementById('backgroundToForegroundButton');
+  backgroundToForegroundButton.addEventListener('click', () => {
+    selectColor(backgroundColor.clone());
   });
 
   wedgeCountBox.addEventListener('input', e => {
