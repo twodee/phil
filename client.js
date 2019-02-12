@@ -721,6 +721,57 @@ class Image {
     );
   }
 
+  flipLeftRight() {
+    let originalImage = this.clone();
+    for (let r = 0; r < this.height; ++r) {
+      for (let c = 0; c < this.width; ++c) {
+        let cc = this.width - 1 - c;
+        this.set(c, r, originalImage.get(cc, r));
+      }
+    }
+  }
+
+  flipTopBottom() {
+    let originalImage = this.clone();
+    for (let r = 0; r < this.height; ++r) {
+      for (let c = 0; c < this.width; ++c) {
+        let rr = this.height - 1 - r;
+        this.set(c, r, originalImage.get(c, rr));
+      }
+    }
+  }
+
+  rotateClockwise() {
+    let originalImage = this.clone();
+    this.resize(this.height, this.width);
+
+    for (let r = 0; r < this.height; ++r) {
+      for (let c = 0; c < this.width; ++c) {
+        this.set(c, r, originalImage.get(r, this.width - 1 - c));
+      }
+    }
+  }
+
+  rotateCounterclockwise() {
+    let originalImage = this.clone();
+    this.resize(this.height, this.width);
+
+    for (let r = 0; r < this.height; ++r) {
+      for (let c = 0; c < this.width; ++c) {
+        this.set(c, r, originalImage.get(this.height - 1 - r, c));
+      }
+    }
+  }
+
+  rotate180() {
+    let originalImage = this.clone();
+    for (let r = 0; r < this.height; ++r) {
+      for (let c = 0; c < this.width; ++c) {
+        this.set(c, r, originalImage.get(this.width - 1 - c, this.height - 1 - r));
+      }
+    }
+  }
+
   outline4(backgroundColor, outlineColor) {
     let originalImage = this.clone();
 
@@ -1991,7 +2042,60 @@ function registerCallbacks() {
     render();
     history.current.newImage = image.clone();
     history.commit();
-  })
+  });
+
+  let flipLeftRightButton = document.getElementById('flipLeftRightButton');
+  flipLeftRightButton.addEventListener('click', e => {
+    history.begin(new UndoableImage());
+    image.flipLeftRight();
+    imageTexture.upload();
+    render();
+    history.current.newImage = image.clone();
+    history.commit();
+  });
+
+  let flipTopBottomButton = document.getElementById('flipTopBottomButton');
+  flipTopBottomButton.addEventListener('click', e => {
+    history.begin(new UndoableImage());
+    image.flipTopBottom();
+    imageTexture.upload();
+    render();
+    history.current.newImage = image.clone();
+    history.commit();
+  });
+
+  let rotate180Button = document.getElementById('rotate180Button');
+  rotate180Button.addEventListener('click', e => {
+    history.begin(new UndoableImage());
+    image.rotate180();
+    imageTexture.upload();
+    updateProjection();
+    render();
+    history.current.newImage = image.clone();
+    history.commit();
+  });
+
+  let rotateClockwiseButton = document.getElementById('rotateClockwiseButton');
+  rotateClockwiseButton.addEventListener('click', e => {
+    history.begin(new UndoableImage());
+    image.rotateClockwise();
+    imageTexture.upload();
+    updateProjection();
+    render();
+    history.current.newImage = image.clone();
+    history.commit();
+  });
+
+  let rotateCounterclockwiseButton = document.getElementById('rotateCounterclockwiseButton');
+  rotateCounterclockwiseButton.addEventListener('click', e => {
+    history.begin(new UndoableImage());
+    image.rotateCounterclockwise();
+    imageTexture.upload();
+    updateProjection();
+    render();
+    history.current.newImage = image.clone();
+    history.commit();
+  });
 
   let autocropButton = document.getElementById('autocropButton');
   autocropButton.addEventListener('click', e => {
