@@ -114,6 +114,8 @@ DrawingMode.None = 0;
 DrawingMode.RotationalMirroring = 1;
 DrawingMode.ArrayTiling = 2;
 
+let isDirty;
+
 // Lines
 let linesProgram;
 let linesProjectionUniform;
@@ -519,6 +521,7 @@ class Image {
   }
 
   set(c, r, rgb) {
+    isDirty = true;
     let start = (r * this.width + c) * 4;
     this.bytes[start + 0] = rgb.r;
     this.bytes[start + 1] = rgb.g;
@@ -545,6 +548,7 @@ class Image {
   }
 
   replace(c, r, newColor) {
+    isDirty = true;
     let oldColor = this.get(c, r);
 
     // Walk through pixels. If pixel is oldColor, replace it.
@@ -559,6 +563,7 @@ class Image {
   }
 
   fill(c, r, color, isDiagonal = false) {
+    isDirty = true;
     let oldColor = this.get(c, r);
     let newColor = color.clone();
 
@@ -646,6 +651,7 @@ class Image {
   }
 
   extract(t, r, b, l) {
+    isDirty = true;
     let newWidth = this.width - l - r;
     let newHeight = this.height - t - b;
     let newBytes = Buffer.alloc(newWidth * newHeight * 4);
@@ -666,6 +672,7 @@ class Image {
   }
 
   extend(t, r, b, l) {
+    isDirty = true;
     let newWidth = this.width + l + r;
     let newHeight = this.height + t + b;
     let newBytes = Buffer.alloc(newWidth * newHeight * 4);
@@ -686,12 +693,14 @@ class Image {
   }
 
   resize(newWidth, newHeight) {
+    isDirty = true;
     this.bytes = Buffer.alloc(newWidth * newHeight * 4, 255);
     this.width = newWidth;
     this.height = newHeight;
   }
 
   shiftWrap(dc, dr) {
+    isDirty = true;
     let newBytes = Buffer.alloc(this.width * this.height * 4, 255);
     for (let r = 0; r < this.height; ++r) {
       for (let c = 0; c < this.width; ++c) {
@@ -706,6 +715,7 @@ class Image {
   }
 
   resizeDelta(t, r, b, l) {
+    isDirty = true;
     this.extract(
       t < 0 ? -t : 0,
       r < 0 ? -r : 0,
@@ -722,6 +732,7 @@ class Image {
   }
 
   flipLeftRight() {
+    isDirty = true;
     let originalImage = this.clone();
     for (let r = 0; r < this.height; ++r) {
       for (let c = 0; c < this.width; ++c) {
@@ -732,6 +743,7 @@ class Image {
   }
 
   flipTopBottom() {
+    isDirty = true;
     let originalImage = this.clone();
     for (let r = 0; r < this.height; ++r) {
       for (let c = 0; c < this.width; ++c) {
@@ -742,6 +754,7 @@ class Image {
   }
 
   rotateClockwise() {
+    isDirty = true;
     let originalImage = this.clone();
     this.resize(this.height, this.width);
 
@@ -753,6 +766,7 @@ class Image {
   }
 
   rotateCounterclockwise() {
+    isDirty = true;
     let originalImage = this.clone();
     this.resize(this.height, this.width);
 
@@ -764,6 +778,7 @@ class Image {
   }
 
   rotate180() {
+    isDirty = true;
     let originalImage = this.clone();
     for (let r = 0; r < this.height; ++r) {
       for (let c = 0; c < this.width; ++c) {
@@ -773,6 +788,7 @@ class Image {
   }
 
   outline4(backgroundColor, outlineColor) {
+    isDirty = true;
     let originalImage = this.clone();
 
     for (let r = 0; r < this.height; ++r) {
@@ -807,6 +823,7 @@ class Image {
   }
 
   autocrop(backgroundColor) {
+    isDirty = true;
     let l = 0;
     let r = this.width - 1;
     let t = 0;
@@ -1706,7 +1723,6 @@ function onMouseWheel(e) {
 }
 
 function onReady() {
-
   // Grab references to widgets.
   canvas = document.getElementById('canvas');
   undosList = document.getElementById('undosList');
@@ -1761,6 +1777,8 @@ function onReady() {
   syncWidgets();
   registerCallbacks();
   onSize();
+
+  isDirty = false;
 }
 
 function syncWidgets() {
@@ -2428,6 +2446,7 @@ function saveImage(path) {
       channels: image.nchannels,
     }
   }).toFile(imagePath, error => {
+    isDirty = false;
     console.log("error:", error);
   });
 }
@@ -2473,7 +2492,11 @@ ipcRenderer.on('saveAs', function(event, data) {
 });
 
 ipcRenderer.on('save', function(event, data) {
-  saveImage(imagePath);
+  if (imagePath) {
+    saveImage(imagePath);
+  } else {
+    saveAs();
+  }
 });
 
 ipcRenderer.on('update-color-history', function(event, history) {

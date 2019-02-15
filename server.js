@@ -194,10 +194,35 @@ function loadImage(image) {
           browser.webContents.send('loadImage', image.path, info.width, info.height, info.channels, data);
           browser.webContents.send('update-color-palette', colorPalette);
         });
+
+        browser.on('close', e => {
+          e.preventDefault();
+          checkDirty(browser);
+        });
       });
     })
   .catch(e => {
     console.error(e);
+  });
+}
+
+function checkDirty(browser) {
+  browser.webContents.executeJavaScript('isDirty').then(isDirty => {
+    if (isDirty) {
+      let options = {
+        type: 'question',
+        buttons: ['Yes', 'No'],
+        title: 'Confirm',
+        message: 'You have unsaved changes. Are you sure you want to quit?'
+      }
+      let choice = dialog.showMessageBox(browser, options);
+
+      if (choice == 0) {
+        browser.destroy();
+      }
+    } else {
+      browser.destroy();
+    }
   });
 }
 
