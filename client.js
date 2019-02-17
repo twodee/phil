@@ -122,6 +122,12 @@ let linesProjectionUniform;
 let linesModelviewUniform;
 let linesColorUniform;
 
+let outlineProgram;
+let outlineProjectionUniform;
+let outlineModelviewUniform;
+let outlineColorUniform;
+let outlineScaleUniform;
+
 // Grid
 let isGridShown;
 let isGridShownBox;
@@ -1166,6 +1172,39 @@ void main() {
   gl.useProgram(null);
 }
 
+function createOutlineProgram() {
+  let vertexSource = `#version 300 es
+uniform mat4 projection;
+uniform mat4 modelview;
+uniform float scale;
+in vec4 position;
+in vec2 offset;
+
+void main() {
+  gl_Position = projection * modelview * (position + vec4(offset * scale, 0.0, 0.0));
+}
+  `;
+
+  let fragmentSource = `#version 300 es
+precision mediump float;
+uniform vec4 color;
+out vec4 fragmentColor;
+
+void main() {
+  fragmentColor = color;
+}
+  `; 
+
+  let vertexShader = compileShader(gl.VERTEX_SHADER, vertexSource);
+  let fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
+  outlineProgram = linkProgram(vertexShader, fragmentShader);
+
+  outlineProjectionUniform = gl.getUniformLocation(outlineProgram, 'projection');
+  outlineModelviewUniform = gl.getUniformLocation(outlineProgram, 'modelview');
+  outlineColorUniform = gl.getUniformLocation(outlineProgram, 'color');
+  outlineScaleUniform = gl.getUniformLocation(outlineProgram, 'scale');
+}
+
 function createLinesProgram() {
   let vertexSource = `#version 300 es
 uniform mat4 projection;
@@ -1354,32 +1393,109 @@ function updateGrid() {
 function updateBorder() {
   let vertices = [];
 
+  let away = Math.sqrt(2);
+
+  // Inner
+
+  // Bottom left
   vertices.push(-1);
   vertices.push(-1);
   vertices.push(0);
   vertices.push(1);
 
+  vertices.push(0);
+  vertices.push(0);
+
+  // Bottom right
   vertices.push(1);
   vertices.push(-1);
   vertices.push(0);
   vertices.push(1);
 
+  vertices.push(0);
+  vertices.push(0);
+
+  // Top right
   vertices.push(1);
   vertices.push(1);
   vertices.push(0);
   vertices.push(1);
 
+  vertices.push(0);
+  vertices.push(0);
+
+  // Top left
   vertices.push(-1);
   vertices.push(1);
   vertices.push(0);
   vertices.push(1);
+
+  vertices.push(0);
+  vertices.push(0);
+
+  // Outer
+
+  // Bottom left
+  vertices.push(-1);
+  vertices.push(-1);
+  vertices.push(0);
+  vertices.push(1);
+
+  vertices.push(-away);
+  vertices.push(-away);
+
+  // Bottom right
+  vertices.push(1);
+  vertices.push(-1);
+  vertices.push(0);
+  vertices.push(1);
+
+  vertices.push(away);
+  vertices.push(-away);
+
+  // Top right
+  vertices.push(1);
+  vertices.push(1);
+  vertices.push(0);
+  vertices.push(1);
+
+  vertices.push(away);
+  vertices.push(away);
+
+  // Top left
+  vertices.push(-1);
+  vertices.push(1);
+  vertices.push(0);
+  vertices.push(1);
+
+  vertices.push(-away);
+  vertices.push(away);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, borderVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
-  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
-  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  let indices = [
+    0, 5, 1,
+    0, 4, 5,
+    1, 6, 2,
+    1, 5, 6,
+    2, 7, 3,
+    2, 6, 7,
+    3, 4, 0,
+    3, 7, 4,
+  ];
+
+  borderIndexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, borderIndexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+  let positionAttributeLocation = gl.getAttribLocation(outlineProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 24, 0);
   gl.enableVertexAttribArray(positionAttributeLocation);
+
+  let offsetAttributeLocation = gl.getAttribLocation(outlineProgram, 'offset');
+  gl.vertexAttribPointer(offsetAttributeLocation, 2, gl.FLOAT, false, 24, 16);
+  gl.enableVertexAttribArray(offsetAttributeLocation);
 }
 
 function createImage() {
@@ -1414,18 +1530,17 @@ void main() {
   let fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentSource);
   imageProgram = linkProgram(vertexShader, fragmentShader);
 
-  let scale = 1.0;
   let vertices = [
-    -scale, -scale, 0.0, 1.0,
+    -1.0, -1.0, 0.0, 1.0,
     0.0, 1.0,
 
-    scale, -scale, 0.0, 1.0,
+    1.0, -1.0, 0.0, 1.0,
     1.0, 1.0,
 
-    -scale, scale, 0.0, 1.0,
+    -1.0, 1.0, 0.0, 1.0,
     0.0, 0.0,
 
-    scale, scale, 0.0, 1.0,
+    1.0, 1.0, 0.0, 1.0,
     1.0, 0.0,
   ];
 
@@ -1716,7 +1831,6 @@ function onMouseWheel(e) {
   let factor = 1 - e.deltaY / 100;
   if (scale * factor > 0.1) {
     scale *= factor;
-  } else {
     modelview = Matrix4.scale(factor, factor, 1).multiplyMatrix(modelview);
   }
   render();
@@ -1767,6 +1881,7 @@ function onReady() {
   createBackground();
   createImage();
   createLinesProgram();
+  createOutlineProgram();
   createArrayTilingGrid();
   createRotationalMirroringAxes();
   createGrid();
@@ -1779,6 +1894,7 @@ function onReady() {
   onSize();
 
   isDirty = false;
+  scale = 1.0;
 }
 
 function syncWidgets() {
@@ -2329,9 +2445,13 @@ function render() {
       gl.drawArrays(gl.LINES, 0, gridLineCount * 2);
     }
 
-    gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.5, 1.0);
+    gl.useProgram(outlineProgram);
+    gl.uniformMatrix4fv(outlineProjectionUniform, false, projection.toBuffer());
+    gl.uniformMatrix4fv(outlineModelviewUniform, false, modelview.toBuffer());
+    gl.uniform4f(outlineColorUniform, 0.0, 0.0, 0.0, 1.0);
+    gl.uniform1f(outlineScaleUniform, 0.01 / scale);
     gl.bindVertexArray(borderVao);
-    gl.drawArrays(gl.LINE_LOOP, 0, 4);
+    gl.drawElements(gl.TRIANGLES, 24, gl.UNSIGNED_SHORT, 0);
 
     gl.bindVertexArray(null);
     gl.useProgram(null);
