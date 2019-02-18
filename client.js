@@ -128,6 +128,11 @@ let outlineModelviewUniform;
 let outlineColorUniform;
 let outlineScaleUniform;
 
+let borderIndexBuffer;
+let gridIndexBuffer;
+let arrayTilingIndexBuffer;
+let rotationalMirroringAxesIndexBuffer;
+
 // Grid
 let isGridShown;
 let isGridShownBox;
@@ -1265,39 +1270,57 @@ function createArrayTilingGrid() {
 
 function updateRotationalMirroringAxes() {
   let vertices = [];
+  let indices = [];
 
   let delta = 2 * Math.PI / wedgeCount;
   for (let i = 0; i < wedgeCount; ++i) {
-    // Center
-    vertices.push(0);
-    vertices.push(0);
-    vertices.push(0);
-    vertices.push(1);
-
     // The anchor is the positive y-axis.
     let base = 2 * Math.PI / 4;
     base += rotationOffset * Math.PI / 180;
 
     let theta = i * delta + base;
     let radius = 1.414;
+    let x = radius * Math.cos(theta);
+    let y = radius * Math.sin(theta);
+    let offset = [-Math.sin(theta), Math.cos(theta)];
 
-    // Perimeter Point
-    vertices.push(radius * Math.cos(theta));
-    vertices.push(radius * Math.sin(theta));
-    vertices.push(0);
-    vertices.push(1);
+    vertices.push(0, 0, 0, 1);
+    vertices.push(offset[0], offset[1]);
+
+    vertices.push(x, y, 0, 1);
+    vertices.push(offset[0], offset[1]);
+
+    vertices.push(0, 0, 0, 1);
+    vertices.push(-offset[0], -offset[1]);
+
+    vertices.push(x, y, 0, 1);
+    vertices.push(-offset[0], -offset[1]);
+
+    indices.push(i * 4 + 0, i * 4 + 2, i * 4 + 3);
+    indices.push(i * 4 + 0, i * 4 + 3, i * 4 + 1);
   }
+
+  gl.bindVertexArray(rotationalMirroringAxesVao);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, rotationalMirroringAxesVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
-  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
-  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  let positionAttributeLocation = gl.getAttribLocation(outlineProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 24, 0);
   gl.enableVertexAttribArray(positionAttributeLocation);
+
+  let offsetAttributeLocation = gl.getAttribLocation(outlineProgram, 'offset');
+  gl.vertexAttribPointer(offsetAttributeLocation, 2, gl.FLOAT, false, 24, 16);
+  gl.enableVertexAttribArray(offsetAttributeLocation);
+
+  rotationalMirroringAxesIndexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, rotationalMirroringAxesIndexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 }
 
 function updateArrayTilingGrid() {
   let vertices = [];
+  let indices = [];
 
   arrayTilingLineCount = 0;
 
@@ -1305,15 +1328,22 @@ function updateArrayTilingGrid() {
     for (let x = tileSize.x; x < image.width; x += tileSize.x) {
       let xx = x / (image.width) * 2 - 1;
 
-      vertices.push(xx);
-      vertices.push(-1);
-      vertices.push(0);
-      vertices.push(1);
+      // Left
+      vertices.push(xx, -1, 0, 1);
+      vertices.push(-1, 0);
 
-      vertices.push(xx);
-      vertices.push(1);
-      vertices.push(0);
-      vertices.push(1);
+      vertices.push(xx, 1, 0, 1);
+      vertices.push(-1, 0);
+
+      // Right
+      vertices.push(xx, -1, 0, 1);
+      vertices.push(1, 0);
+
+      vertices.push(xx, 1, 0, 1);
+      vertices.push(1, 0);
+
+      indices.push(arrayTilingLineCount * 4 + 0, arrayTilingLineCount * 4 + 2, arrayTilingLineCount * 4 + 3);
+      indices.push(arrayTilingLineCount * 4 + 0, arrayTilingLineCount * 4 + 3, arrayTilingLineCount * 4 + 1);
 
       arrayTilingLineCount += 1;
     }
@@ -1321,30 +1351,48 @@ function updateArrayTilingGrid() {
     for (let y = tileSize.y; y < image.height; y += tileSize.y) {
       let yy = y / (image.height) * 2 - 1;
 
-      vertices.push(-1);
-      vertices.push(yy);
-      vertices.push(0);
-      vertices.push(1);
+      // Top
+      vertices.push(-1, yy, 0, 1);
+      vertices.push(0, 1);
 
-      vertices.push(1);
-      vertices.push(yy);
-      vertices.push(0);
-      vertices.push(1);
+      vertices.push(1, yy, 0, 1);
+      vertices.push(0, 1);
+
+      // Bottom
+      vertices.push(-1, yy, 0, 1);
+      vertices.push(0, -1);
+
+      vertices.push(1, yy, 0, 1);
+      vertices.push(0, -1);
+
+      indices.push(arrayTilingLineCount * 4 + 0, arrayTilingLineCount * 4 + 2, arrayTilingLineCount * 4 + 3);
+      indices.push(arrayTilingLineCount * 4 + 0, arrayTilingLineCount * 4 + 3, arrayTilingLineCount * 4 + 1);
 
       arrayTilingLineCount += 1;
     }
   }
 
+  gl.bindVertexArray(arrayTilingGridVao);
+
   gl.bindBuffer(gl.ARRAY_BUFFER, arrayTilingGridVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
-  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
-  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  let positionAttributeLocation = gl.getAttribLocation(outlineProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 24, 0);
   gl.enableVertexAttribArray(positionAttributeLocation);
+
+  let offsetAttributeLocation = gl.getAttribLocation(outlineProgram, 'offset');
+  gl.vertexAttribPointer(offsetAttributeLocation, 2, gl.FLOAT, false, 24, 16);
+  gl.enableVertexAttribArray(offsetAttributeLocation);
+
+  arrayTilingIndexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, arrayTilingIndexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 }
 
 function updateGrid() {
   let vertices = [];
+  let indices = [];
 
   gridLineCount = 0;
 
@@ -1352,15 +1400,22 @@ function updateGrid() {
     for (let x = gridCellSize.x; x < image.width; x += gridCellSize.x) {
       let xx = x / (image.width) * 2 - 1;
 
-      vertices.push(xx);
-      vertices.push(-1);
-      vertices.push(0);
-      vertices.push(1);
+      // Left
+      vertices.push(xx, -1, 0, 1);
+      vertices.push(-1, 0);
 
-      vertices.push(xx);
-      vertices.push(1);
-      vertices.push(0);
-      vertices.push(1);
+      vertices.push(xx, 1, 0, 1);
+      vertices.push(-1, 0);
+
+      // Right
+      vertices.push(xx, -1, 0, 1);
+      vertices.push(1, 0);
+
+      vertices.push(xx, 1, 0, 1);
+      vertices.push(1, 0);
+
+      indices.push(gridLineCount * 4 + 0, gridLineCount * 4 + 2, gridLineCount * 4 + 3);
+      indices.push(gridLineCount * 4 + 0, gridLineCount * 4 + 3, gridLineCount * 4 + 1);
 
       gridLineCount += 1;
     }
@@ -1368,26 +1423,43 @@ function updateGrid() {
     for (let y = gridCellSize.y; y < image.height; y += gridCellSize.y) {
       let yy = y / (image.height) * 2 - 1;
 
-      vertices.push(-1);
-      vertices.push(yy);
-      vertices.push(0);
-      vertices.push(1);
+      // Top
+      vertices.push(-1, yy, 0, 1);
+      vertices.push(0, 1);
 
-      vertices.push(1);
-      vertices.push(yy);
-      vertices.push(0);
-      vertices.push(1);
+      vertices.push(1, yy, 0, 1);
+      vertices.push(0, 1);
+
+      // Bottom
+      vertices.push(-1, yy, 0, 1);
+      vertices.push(0, -1);
+
+      vertices.push(1, yy, 0, 1);
+      vertices.push(0, -1);
+
+      indices.push(gridLineCount * 4 + 0, gridLineCount * 4 + 2, gridLineCount * 4 + 3);
+      indices.push(gridLineCount * 4 + 0, gridLineCount * 4 + 3, gridLineCount * 4 + 1);
 
       gridLineCount += 1;
     }
   }
 
+  gl.bindVertexArray(gridVao);
+
   gl.bindBuffer(gl.ARRAY_BUFFER, gridVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
-  let positionAttributeLocation = gl.getAttribLocation(linesProgram, 'position');
-  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+  let positionAttributeLocation = gl.getAttribLocation(outlineProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 24, 0);
   gl.enableVertexAttribArray(positionAttributeLocation);
+
+  let offsetAttributeLocation = gl.getAttribLocation(outlineProgram, 'offset');
+  gl.vertexAttribPointer(offsetAttributeLocation, 2, gl.FLOAT, false, 24, 16);
+  gl.enableVertexAttribArray(offsetAttributeLocation);
+
+  gridIndexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gridIndexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 }
 
 function updateBorder() {
@@ -1398,81 +1470,38 @@ function updateBorder() {
   // Inner
 
   // Bottom left
-  vertices.push(-1);
-  vertices.push(-1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(0);
-  vertices.push(0);
+  vertices.push(-1, -1, 0, 1);
+  vertices.push(0, 0);
 
   // Bottom right
-  vertices.push(1);
-  vertices.push(-1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(0);
-  vertices.push(0);
+  vertices.push(1, -1, 0, 1);
+  vertices.push(0, 0);
 
   // Top right
-  vertices.push(1);
-  vertices.push(1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(0);
-  vertices.push(0);
+  vertices.push(1, 1, 0, 1);
+  vertices.push(0, 0);
 
   // Top left
-  vertices.push(-1);
-  vertices.push(1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(0);
-  vertices.push(0);
+  vertices.push(-1, 1, 0, 1);
+  vertices.push(0, 0);
 
   // Outer
 
   // Bottom left
-  vertices.push(-1);
-  vertices.push(-1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(-away);
-  vertices.push(-away);
+  vertices.push(-1, -1, 0, 1);
+  vertices.push(-away, -away);
 
   // Bottom right
-  vertices.push(1);
-  vertices.push(-1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(away);
-  vertices.push(-away);
+  vertices.push(1, -1, 0, 1);
+  vertices.push(away, -away);
 
   // Top right
-  vertices.push(1);
-  vertices.push(1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(away);
-  vertices.push(away);
+  vertices.push(1, 1, 0, 1);
+  vertices.push(away, away);
 
   // Top left
-  vertices.push(-1);
-  vertices.push(1);
-  vertices.push(0);
-  vertices.push(1);
-
-  vertices.push(-away);
-  vertices.push(away);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, borderVbo);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+  vertices.push(-1, 1, 0, 1);
+  vertices.push(-away, away);
 
   let indices = [
     0, 5, 1,
@@ -1484,6 +1513,11 @@ function updateBorder() {
     3, 4, 0,
     3, 7, 4,
   ];
+
+  gl.bindVertexArray(borderVao);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, borderVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
   borderIndexBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, borderIndexBuffer);
@@ -2425,33 +2459,38 @@ function render() {
     gl.useProgram(null);
 
     // Draw lines.
-    gl.useProgram(linesProgram);
-    gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
-    gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
-
-    if (drawingMode == DrawingMode.RotationalMirroring) {
-      gl.uniform4f(linesColorUniform, 1.0, 1.0, 1.0, 1.0);
-      gl.bindVertexArray(rotationalMirroringAxesVao);
-      gl.drawArrays(gl.LINES, 0, wedgeCount * 2);
-    } else if (drawingMode == DrawingMode.ArrayTiling) {
-      gl.uniform4f(linesColorUniform, 1.0, 0.5, 0.0, 1.0);
-      gl.bindVertexArray(arrayTilingGridVao);
-      gl.drawArrays(gl.LINES, 0, arrayTilingLineCount * 2);
-    }
-
-    if (isGridShown) {
-      gl.uniform4f(linesColorUniform, 1.0, 1.0, 1.0, 1.0);
-      gl.bindVertexArray(gridVao);
-      gl.drawArrays(gl.LINES, 0, gridLineCount * 2);
-    }
+    // gl.useProgram(linesProgram);
+    // gl.uniformMatrix4fv(linesProjectionUniform, false, projection.toBuffer());
+    // gl.uniformMatrix4fv(linesModelviewUniform, false, modelview.toBuffer());
 
     gl.useProgram(outlineProgram);
     gl.uniformMatrix4fv(outlineProjectionUniform, false, projection.toBuffer());
     gl.uniformMatrix4fv(outlineModelviewUniform, false, modelview.toBuffer());
     gl.uniform4f(outlineColorUniform, 0.0, 0.0, 0.0, 1.0);
+
+    if (isGridShown) {
+      gl.uniform4f(outlineColorUniform, 0.0, 0.0, 0.0, 1.0);
+      gl.uniform1f(outlineScaleUniform, 0.002 / scale);
+      gl.bindVertexArray(gridVao);
+      gl.drawElements(gl.TRIANGLES, gridLineCount * 6, gl.UNSIGNED_SHORT, 0);
+    }
+
     gl.uniform1f(outlineScaleUniform, 0.01 / scale);
+    gl.uniform4f(outlineColorUniform, 0.0, 0.0, 0.0, 1.0);
     gl.bindVertexArray(borderVao);
-    gl.drawElements(gl.TRIANGLES, 24, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, 4 * 6, gl.UNSIGNED_SHORT, 0);
+
+    if (drawingMode == DrawingMode.RotationalMirroring) {
+      gl.uniform4f(outlineColorUniform, 0.0, 0.5, 1.0, 1.0);
+      gl.uniform1f(outlineScaleUniform, 0.002 / scale);
+      gl.bindVertexArray(rotationalMirroringAxesVao);
+      gl.drawElements(gl.TRIANGLES, wedgeCount * 6, gl.UNSIGNED_SHORT, 0);
+    } else if (drawingMode == DrawingMode.ArrayTiling) {
+      gl.uniform4f(outlineColorUniform, 1.0, 0.5, 0.0, 1.0);
+      gl.uniform1f(outlineScaleUniform, 0.002 / scale);
+      gl.bindVertexArray(arrayTilingGridVao);
+      gl.drawElements(gl.TRIANGLES, arrayTilingLineCount * 6, gl.UNSIGNED_SHORT, 0);
+    }
 
     gl.bindVertexArray(null);
     gl.useProgram(null);
