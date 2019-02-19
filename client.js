@@ -2087,7 +2087,7 @@ function registerCallbacks() {
   tools[Tool.Syringe] = document.getElementById('syringe');
   tools[Tool.Eraser] = document.getElementById('eraser');
 
-  activateTool(Tool.Pencil);
+  activateTool(configuration.activeTool);
   for (let iTool = 0; iTool < tools.length; ++iTool) {
     tools[iTool].addEventListener('click', e => {
       activateTool(iTool);
