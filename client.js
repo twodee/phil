@@ -112,15 +112,23 @@ class Color {
   }
 }
 
-
 class DrawingMode {
 }
 DrawingMode.None = 0;
 DrawingMode.RotationalMirroring = 1;
 DrawingMode.ArrayTiling = 2;
 
+class Tool {
+}
+Tool.Pencil = 0;
+Tool.Dropper = 1;
+Tool.Bucket = 2;
+Tool.Syringe = 3;
+Tool.Eraser = 4;
+
 let preferencesPath = require('os').homedir() + '/.phil.json';
 let isDirty;
+let tools;
 
 // Lines
 let linesProgram;
@@ -170,9 +178,7 @@ let tileWidthBox;
 let tileHeightBox;
 
 // Tools
-let activeToolDiv;
 let pendingTool = null;
-let tools = {};
 let pixelCoordinatesBox;
 
 // Undos
@@ -564,7 +570,7 @@ class Image {
     for (let rr = 0; rr < this.height; ++rr) {
       for (let cc = 0; cc < this.width; ++cc) {
         if (this.isPixel(cc, rr, oldColor)) {
-          drawKnownPixel(new Vector2(cc, rr), color);
+          drawKnownPixel(new Vector2(cc, rr), newColor);
           history.current.add(cc, rr, newColor.clone());
         }
       }
@@ -1120,6 +1126,7 @@ class Matrix4 {
 
 class Configuration {
   constructor() {
+    this.activeTool = Tool.Pencil;
     this.isGridShown = false;
     this.tileSize = new Vector2(8, 8);
     this.wedgeCount = 3;
@@ -1760,20 +1767,20 @@ function onMouseDown(e) {
   mouseImage = objectToImage(mouseObject);
 
   if (e.which == 1) {
-    if (activeToolDiv == tools.pencil) {
+    if (configuration.activeTool == Tool.Pencil) {
       rememberColor();
       history.begin(new UndoablePixels());
       drawPixel(mouseImage, configuration.foregroundColor);
       render();
     }
 
-    else if (activeToolDiv == tools.eraser) {
+    else if (configuration.activeTool == Tool.Eraser) {
       history.begin(new UndoablePixels());
       drawPixel(mouseImage, configuration.backgroundColor);
       render();
     }
     
-    else if (activeToolDiv == tools.dropper) {
+    else if (configuration.activeTool == Tool.Dropper) {
       if (isOverImage(mouseImage)) {
         selectColor(image.get(mouseImage.x, mouseImage.y));
       }
@@ -1795,7 +1802,7 @@ function onMouseUp(e) {
   // Mouse up gets called on the window to handle going offscreen. But filling
   // should only happen when the bucket is released on the canvas.
   if (e.target == canvas) {
-    if (activeToolDiv == tools.bucket) {
+    if (configuration.activeTool == Tool.Bucket) {
       mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
       let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
       mouseImage = objectToImage(mouseObject);
@@ -1807,7 +1814,7 @@ function onMouseUp(e) {
         rememberColor();
         render();
       }
-    } else if (activeToolDiv == tools.syringe) {
+    } else if (configuration.activeTool == Tool.Syringe) {
       mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
       let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
       mouseImage = objectToImage(mouseObject);
@@ -1843,7 +1850,7 @@ function onMouseMove(e) {
   let newMouseImage = objectToImage(newMouseObject);
   pixelCoordinatesBox.innerText = `${newMouseImage.x}, ${newMouseImage.y}`;
 
-  if (activeToolDiv == tools.dropper && pendingTool != null) {
+  if (configuration.activeTool == Tool.Dropper && pendingTool != null) {
     hotDrop(newMouseImage);
   }
 
@@ -1867,17 +1874,17 @@ function onMouseMove(e) {
   syncCursor(newMouseImage);
 
   if (e.which == 1) {
-    if (activeToolDiv == tools.pencil) {
+    if (configuration.activeTool == Tool.Pencil) {
       drawLine(mouseImage, newMouseImage, configuration.foregroundColor);
       render();
     }
 
-    else if (activeToolDiv == tools.eraser) {
+    else if (configuration.activeTool == Tool.Eraser) {
       drawLine(mouseImage, newMouseImage, configuration.backgroundColor);
       render();
     }
 
-    else if (activeToolDiv == tools.dropper) {
+    else if (configuration.activeTool == Tool.Dropper) {
       if (isOverImage(mouseScreen)) {
         selectColor(image.get(newMouseImage.x, newMouseImage.y));
       }
@@ -1903,15 +1910,15 @@ function syncCursor(mousePosition) {
   canvas.classList.remove('eraserHovered');
 
   if (mousePosition && isOverImage(mousePosition)) {
-    if (activeToolDiv == tools.pencil) {
+    if (configuration.activeTool == Tool.Pencil) {
       canvas.classList.add('pencilHovered');
-    } else if (activeToolDiv == tools.bucket) {
+    } else if (configuration.activeTool == Tool.Bucket) {
       canvas.classList.add('bucketHovered');
-    } else if (activeToolDiv == tools.dropper) {
+    } else if (configuration.activeTool == Tool.Dropper) {
       canvas.classList.add('dropperHovered');
-    } else if (activeToolDiv == tools.syringe) {
+    } else if (configuration.activeTool == Tool.Syringe) {
       canvas.classList.add('syringeHovered');
-    } else if (activeToolDiv == tools.eraser) {
+    } else if (configuration.activeTool == Tool.Eraser) {
       canvas.classList.add('eraserHovered');
     }
   }
@@ -2073,16 +2080,17 @@ function registerCallbacks() {
   syncHsv();
 
   // Tools
-  tools.pencil = document.getElementById('pencil');
-  tools.dropper = document.getElementById('dropper');
-  tools.bucket = document.getElementById('bucket');
-  tools.syringe = document.getElementById('syringe');
-  tools.eraser = document.getElementById('eraser');
+  tools = new Array(5);
+  tools[Tool.Pencil] = document.getElementById('pencil');
+  tools[Tool.Dropper] = document.getElementById('dropper');
+  tools[Tool.Bucket] = document.getElementById('bucket');
+  tools[Tool.Syringe] = document.getElementById('syringe');
+  tools[Tool.Eraser] = document.getElementById('eraser');
 
-  activateTool(tools.pencil);
-  for (let tool in tools) {
-    tools[tool].addEventListener('click', e => {
-      activateTool(e.srcElement);
+  activateTool(Tool.Pencil);
+  for (let iTool = 0; iTool < tools.length; ++iTool) {
+    tools[iTool].addEventListener('click', e => {
+      activateTool(iTool);
     });
   }
 
@@ -2093,15 +2101,15 @@ function registerCallbacks() {
 
   window.addEventListener('keydown', e => {
     if (e.key == 'p') {
-      activateTool(tools.pencil);
+      activateTool(Tool.Pencil);
     } else if (e.key == 'd') {
-      activateTool(tools.dropper);
+      activateTool(Tool.Dropper);
     } else if (e.key == 'b') {
-      activateTool(tools.bucket);
+      activateTool(Tool.Bucket);
     } else if (e.key == 's') {
-      activateTool(tools.syringe);
+      activateTool(Tool.Syringe);
     } else if (e.key == 'e') {
-      activateTool(tools.eraser);
+      activateTool(Tool.Eraser);
     } else if (e.key == '[') {
       history.undoMostRecent();
     } else if (e.key == ']') {
@@ -2110,8 +2118,8 @@ function registerCallbacks() {
       isShift = true;
     } else if (e.key == 'z' && pendingTool == null) {
       hotDrop(mouseImage);
-      pendingTool = activeToolDiv;
-      activateTool(tools.dropper);
+      pendingTool = configuration.activeTool;
+      activateTool(Tool.Dropper);
     }
   });
 
@@ -2353,12 +2361,12 @@ function updateBackgroundColorPreview() {
   backgroundColorPreview.style['background-color'] = `rgb(${configuration.backgroundColor.r}, ${configuration.backgroundColor.g}, ${configuration.backgroundColor.b})`;
 }
 
-function activateTool(div) {
-  if (activeToolDiv) {
-    activeToolDiv.classList.remove('active');
+function activateTool(tool) {
+  if (tools[configuration.activeTool]) {
+    tools[configuration.activeTool].classList.remove('active');
   }
-  activeToolDiv = div;
-  activeToolDiv.classList.add('active');
+  configuration.activeTool = tool;
+  tools[tool].classList.add('active');
   syncCursor(mouseImage);
 }
 
