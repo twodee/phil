@@ -12,7 +12,7 @@
     <div id="left"><canvas id="canvas"></canvas></div>
     <div id="right">
       <div class="panel">
-        <div class="panelHeader open">Tools</div>
+        <div class="panelHeader" id="toolsHeader">Tools</div>
         <div class="panelBody">
           <div id="toolPalette">
             <div class="tool" id="pencil"><img src="images/pencil.png"></div>
@@ -25,14 +25,14 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Information</div>
+        <div class="panelHeader" id="informationHeader">Information</div>
         <div class="panelBody">
           <div>Pixel position: <span id="pixelCoordinatesBox">-</span></div>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Color</div>
+        <div class="panelHeader" id="colorHeader">Color</div>
         <div class="panelBody">
           <div id="channelsRoot">
             <span class="channelLabel">Red</span>
@@ -84,7 +84,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Autodraw</div>
+        <div class="panelHeader" id="autodrawHeader">Autodraw</div>
         <div class="panelBody">
           <div class="autoDrawSection">
             <label><input type="radio" id="autoDrawNoneButton" name="autoDraw" checked>None</label>
@@ -111,7 +111,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Grid</div>
+        <div class="panelHeader" id="gridHeader">Grid</div>
         <div class="panelBody">
           <div class="settingsRoot">
             <label class="span2"><input type="checkbox" id="isGridShownBox"><span>Show grid</span></label>
@@ -124,7 +124,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Effects</div>
+        <div class="panelHeader" id="effectsHeader">Effects</div>
         <div class="panelBody">
           <fieldset>
             <legend>Outline</legend>
@@ -134,7 +134,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader">Undo</div>
+        <div class="panelHeader" id="undoHeader">Undo</div>
         <div class="panelBody">
           <div id="undosList">
           </div>
@@ -142,7 +142,7 @@
       </div>
 
       <div class="panel">
-        <div class="panelHeader open">Canvas</div>
+        <div class="panelHeader" id="canvasHeader">Canvas</div>
         <div class="panelBody">
           <fieldset>
             <legend>Add/Remove Margins</legend>

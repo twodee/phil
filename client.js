@@ -1,6 +1,7 @@
 const sharp = require('sharp');
 const { ipcRenderer } = require('electron')
 const fsdialog = require('electron').remote.dialog;
+const fs = require('fs');
 const Dialogs = require('dialogs');
 let dialogs = Dialogs();
 
@@ -88,6 +89,10 @@ class Color {
     return `[${this.r} ${this.g} ${this.b} ${this.a}]`;
   }
 
+  toJSON() {
+    return this.values;
+  }
+
   static fromBytes(r, g, b, a) {
     let color = new Color();
     color.values[0] = r; 
@@ -114,6 +119,7 @@ DrawingMode.None = 0;
 DrawingMode.RotationalMirroring = 1;
 DrawingMode.ArrayTiling = 2;
 
+let preferencesPath = require('os').homedir() + '/.phil.json';
 let isDirty;
 
 // Lines
@@ -134,9 +140,7 @@ let arrayTilingIndexBuffer;
 let rotationalMirroringAxesIndexBuffer;
 
 // Grid
-let isGridShown;
 let isGridShownBox;
-let gridCellSize;
 let gridVao;
 let gridVbo;
 let gridCellWidthBox;
@@ -150,11 +154,8 @@ let borderVbo;
 // Rotational mirroring
 let rotationalMirroringAxesVao;
 let rotationalMirroringAxesVbo;
-let wedgeCount;
-let rotationOffset;
 
 // Array tiling
-let tileSize;
 let arrayTilingGridVao;
 let arrayTilingGridVbo;
 let arrayTilingLineCount;
@@ -173,7 +174,6 @@ let activeToolDiv;
 let pendingTool = null;
 let tools = {};
 let pixelCoordinatesBox;
-let drawingMode;
 
 // Undos
 let undosList;
@@ -186,8 +186,6 @@ let channelsRoot;
 let colorPreview;
 let backgroundColorPreview;
 let colorHistoryRoot;
-let foregroundColor = Color.fromBytes(0, 0, 0, 255);
-let backgroundColor = Color.fromBytes(255, 255, 255, 0);
 
 let shiftWrapButton;
 let horizontalShiftWrapBox;
@@ -889,6 +887,10 @@ class Vector2 {
     this.values = [x, y];
   }
 
+  toJSON() {
+    return this.values;
+  }
+
   add(that) {
     return new Vector2(this.x + that.x, this.y + that.y);
   }
@@ -956,6 +958,10 @@ class Vector2 {
 
   static diagonalDistance(from, to) {
     return to.subtract(from).abs().maxValue();
+  }
+
+  static fromArray(array) {
+    return new Vector2(array[0], array[1]);
   }
 }
 
@@ -1111,6 +1117,56 @@ class Matrix4 {
     return m;
   }
 }
+
+class Configuration {
+  constructor() {
+    this.isGridShown = false;
+    this.tileSize = new Vector2(8, 8);
+    this.wedgeCount = 3;
+    this.rotationOffset = 0;
+    this.drawingMode = DrawingMode.None;
+    this.foregroundColor = Color.fromBytes(0, 0, 0, 255);
+    this.backgroundColor = Color.fromBytes(255, 255, 255, 0);
+    this.gridCellSize = new Vector2(4, 4);
+    this.isPanelOpened = {
+      tools: true,
+      information: false,
+      color: false,
+      autodraw: false,
+      grid: false,
+      effects: false,
+      undo: false,
+      canvas: false,
+    };
+  }
+
+  simplify() {
+    let object = {};
+    for (let key in this) {
+      if (this.hasOwnProperty(key)) {
+        if (this[key] instanceof Vector2) {
+          object[key] = this[key].values;
+        } else if (this[key] instanceof Color) {
+          object[key] = this[key].values;
+        } else {
+          object[key] = this[key];
+        }
+      }
+    }
+    return object;
+  }
+
+  static fromPojo(pojo) {
+    let configuration = Object.assign(new Configuration(), pojo);
+    configuration.foregroundColor = Color.fromByteArray(configuration.foregroundColor);
+    configuration.backgroundColor = Color.fromByteArray(configuration.backgroundColor);
+    configuration.tileSize = Vector2.fromArray(configuration.tileSize);
+    configuration.gridCellSize = Vector2.fromArray(configuration.gridCellSize);
+    return configuration;
+  }
+}
+
+let configuration;
 
 function createBackground() {
   let vertexSource = `#version 300 es
@@ -1272,11 +1328,11 @@ function updateRotationalMirroringAxes() {
   let vertices = [];
   let indices = [];
 
-  let delta = 2 * Math.PI / wedgeCount;
-  for (let i = 0; i < wedgeCount; ++i) {
+  let delta = 2 * Math.PI / configuration.wedgeCount;
+  for (let i = 0; i < configuration.wedgeCount; ++i) {
     // The anchor is the positive y-axis.
     let base = 2 * Math.PI / 4;
-    base += rotationOffset * Math.PI / 180;
+    base += configuration.rotationOffset * Math.PI / 180;
 
     let theta = i * delta + base;
     let radius = 1.414;
@@ -1325,7 +1381,7 @@ function updateArrayTilingGrid() {
   arrayTilingLineCount = 0;
 
   if (image) {
-    for (let x = tileSize.x; x < image.width; x += tileSize.x) {
+    for (let x = configuration.tileSize.x; x < image.width; x += configuration.tileSize.x) {
       let xx = x / (image.width) * 2 - 1;
 
       // Left
@@ -1348,7 +1404,7 @@ function updateArrayTilingGrid() {
       arrayTilingLineCount += 1;
     }
 
-    for (let y = tileSize.y; y < image.height; y += tileSize.y) {
+    for (let y = configuration.tileSize.y; y < image.height; y += configuration.tileSize.y) {
       let yy = y / (image.height) * 2 - 1;
 
       // Top
@@ -1397,7 +1453,7 @@ function updateGrid() {
   gridLineCount = 0;
 
   if (image) {
-    for (let x = gridCellSize.x; x < image.width; x += gridCellSize.x) {
+    for (let x = configuration.gridCellSize.x; x < image.width; x += configuration.gridCellSize.x) {
       let xx = x / (image.width) * 2 - 1;
 
       // Left
@@ -1420,7 +1476,7 @@ function updateGrid() {
       gridLineCount += 1;
     }
 
-    for (let y = gridCellSize.y; y < image.height; y += gridCellSize.y) {
+    for (let y = configuration.gridCellSize.y; y < image.height; y += configuration.gridCellSize.y) {
       let yy = y / (image.height) * 2 - 1;
 
       // Top
@@ -1634,20 +1690,20 @@ function setPixelToColor(p, color) {
 }
 
 function drawKnownPixel(p, color) {
-  if (drawingMode == DrawingMode.None) {
+  if (configuration.drawingMode == DrawingMode.None) {
     setPixelToColor(p, color);
-  } else if (drawingMode == DrawingMode.ArrayTiling) {
-    for (let r = p.y % tileSize.y; r < image.height; r += tileSize.y) {
-      for (let c = p.x % tileSize.x; c < image.width; c += tileSize.x) {
+  } else if (configuration.drawingMode == DrawingMode.ArrayTiling) {
+    for (let r = p.y % configuration.tileSize.y; r < image.height; r += configuration.tileSize.y) {
+      for (let c = p.x % configuration.tileSize.x; c < image.width; c += configuration.tileSize.x) {
         setPixelToColor(new Vector2(c, r), color);
       }
     }
-  } else if (drawingMode == DrawingMode.RotationalMirroring) {
+  } else if (configuration.drawingMode == DrawingMode.RotationalMirroring) {
     let middle = image.size.subtract(new Vector2(1, 1)).multiplyScalar(0.5);
     let diff = p.subtract(middle);
     let radius = diff.magnitude;
     let theta = Math.atan2(diff.y, diff.x);
-    let radiansPerWedge = 2 * Math.PI / wedgeCount;
+    let radiansPerWedge = 2 * Math.PI / configuration.wedgeCount;
 
     // Start at positive x-axis and wind counterclockwise to 2 * pi.
     if (theta < 0) {
@@ -1656,7 +1712,7 @@ function drawKnownPixel(p, color) {
       theta = 2 * Math.PI - theta;
     }
 
-    theta -= Math.PI * 0.5 + rotationOffset * Math.PI / 180;
+    theta -= Math.PI * 0.5 + configuration.rotationOffset * Math.PI / 180;
 
     if (theta < 0) {
       theta += 2 * Math.PI;
@@ -1665,15 +1721,15 @@ function drawKnownPixel(p, color) {
     let iWedge0 = Math.floor(theta / radiansPerWedge);
     let radiansFromWedgeStart = theta - iWedge0 * radiansPerWedge;
 
-    for (let i = 0; i < wedgeCount; ++i) {
+    for (let i = 0; i < configuration.wedgeCount; ++i) {
       let phi;
       if (i % 2 == iWedge0 % 2) {
         phi = i * radiansPerWedge + radiansFromWedgeStart;
       } else {
-        phi = (i + 1) % wedgeCount * radiansPerWedge - radiansFromWedgeStart;
+        phi = (i + 1) % configuration.wedgeCount * radiansPerWedge - radiansFromWedgeStart;
       }
 
-      phi = -(phi + Math.PI * 0.5 + rotationOffset * Math.PI / 180);
+      phi = -(phi + Math.PI * 0.5 + configuration.rotationOffset * Math.PI / 180);
 
       let pp = new Vector2(radius * Math.cos(phi), radius * Math.sin(phi)).add(middle).round();
       if (image.containsPixel(pp)) {
@@ -1707,13 +1763,13 @@ function onMouseDown(e) {
     if (activeToolDiv == tools.pencil) {
       rememberColor();
       history.begin(new UndoablePixels());
-      drawPixel(mouseImage, foregroundColor);
+      drawPixel(mouseImage, configuration.foregroundColor);
       render();
     }
 
     else if (activeToolDiv == tools.eraser) {
       history.begin(new UndoablePixels());
-      drawPixel(mouseImage, backgroundColor);
+      drawPixel(mouseImage, configuration.backgroundColor);
       render();
     }
     
@@ -1730,7 +1786,7 @@ function isOverImage(p) {
 }
 
 function selectColor(rgba) {
-  foregroundColor = rgba;
+  configuration.foregroundColor = rgba;
   syncWidgetsToColor();
   syncHsv();
 }
@@ -1746,7 +1802,7 @@ function onMouseUp(e) {
 
       if (isOverImage(mouseImage)) {
         history.begin(new UndoablePixels());
-        image.fill(mouseImage.x, mouseImage.y, foregroundColor, e.shiftKey);
+        image.fill(mouseImage.x, mouseImage.y, configuration.foregroundColor, e.shiftKey);
         imageTexture.upload();
         rememberColor();
         render();
@@ -1758,7 +1814,7 @@ function onMouseUp(e) {
 
       if (isOverImage(mouseImage)) {
         history.begin(new UndoablePixels());
-        image.replace(mouseImage.x, mouseImage.y, foregroundColor);
+        image.replace(mouseImage.x, mouseImage.y, configuration.foregroundColor);
         imageTexture.upload();
         rememberColor();
         render();
@@ -1812,12 +1868,12 @@ function onMouseMove(e) {
 
   if (e.which == 1) {
     if (activeToolDiv == tools.pencil) {
-      drawLine(mouseImage, newMouseImage, foregroundColor);
+      drawLine(mouseImage, newMouseImage, configuration.foregroundColor);
       render();
     }
 
     else if (activeToolDiv == tools.eraser) {
-      drawLine(mouseImage, newMouseImage, backgroundColor);
+      drawLine(mouseImage, newMouseImage, configuration.backgroundColor);
       render();
     }
 
@@ -1871,6 +1927,14 @@ function onMouseWheel(e) {
 }
 
 function onReady() {
+  let json = fs.readFileSync(preferencesPath, 'utf8');
+  if (json) {
+    let pojo = JSON.parse(json);
+    configuration = Configuration.fromPojo(pojo);
+  } else {
+    configuration = new Configuration();
+  }
+  
   // Grab references to widgets.
   canvas = document.getElementById('canvas');
   undosList = document.getElementById('undosList');
@@ -1901,12 +1965,6 @@ function onReady() {
   // Set default state.
   modelview = new Matrix4();
   isShift = false;
-  wedgeCount = 3;
-  rotationOffset = 0;
-  drawingMode = DrawingMode.None;
-  tileSize = new Vector2(16, 16);
-  gridCellSize = new Vector2(4, 4);
-  isGridShown = false;
 
   // Initialize OpenGL.
   gl = canvas.getContext('webgl2');
@@ -1932,21 +1990,21 @@ function onReady() {
 }
 
 function syncWidgets() {
-  if (drawingMode == DrawingMode.None) {
+  if (configuration.drawingMode == DrawingMode.None) {
     autoDrawNoneButton.checked = true;
-  } else if (drawingMode == DrawingMode.RotationalMirroring) {
+  } else if (configuration.drawingMode == DrawingMode.RotationalMirroring) {
     autoDrawRotationalMirroringButton.checked = true;
-  } else if (drawingMode == DrawingMode.ArrayTiling) {
+  } else if (configuration.drawingMode == DrawingMode.ArrayTiling) {
     autoDrawArrayTilingButton.checked = true;
   }
 
-  wedgeCountBox.value = wedgeCount;
-  rotationOffsetBox.value = rotationOffset;
-  tileWidthBox.value = tileSize.x;
-  tileHeightBox.value = tileSize.y;
-  gridCellWidthBox.value = gridCellSize.x;
-  gridCellHeightBox.value = gridCellSize.y;
-  isGridShownBox.checked = isGridShown;
+  wedgeCountBox.value = configuration.wedgeCount;
+  rotationOffsetBox.value = configuration.rotationOffset;
+  tileWidthBox.value = configuration.tileSize.x;
+  tileHeightBox.value = configuration.tileSize.y;
+  gridCellWidthBox.value = configuration.gridCellSize.x;
+  gridCellHeightBox.value = configuration.gridCellSize.y;
+  isGridShownBox.checked = configuration.isGridShown;
 
   updateBackgroundColorPreview();
 }
@@ -2117,57 +2175,66 @@ function registerCallbacks() {
 
   let headers = document.querySelectorAll('.panelHeader');
   for (let header of headers) {
+    let key = header.id.replace(/Header$/, '');
+
     header.addEventListener('click', e => {
       let headerDiv = e.target;
       headerDiv.classList.toggle('open');
+      configuration.isPanelOpened[key] = headerDiv.classList.contains('open');
     });
+
+    if (configuration.isPanelOpened[key]) {
+      header.classList.add('open');
+    } else {
+      header.classList.remove('open');
+    }
   }
 
   document.getElementById('nameColor').addEventListener('click', nameColor);
 
   autoDrawNoneButton.addEventListener('click', () => {
-    drawingMode = DrawingMode.None; 
+    configuration.drawingMode = DrawingMode.None; 
     render();
   });
 
   autoDrawRotationalMirroringButton.addEventListener('click', () => {
-    drawingMode = DrawingMode.RotationalMirroring; 
+    configuration.drawingMode = DrawingMode.RotationalMirroring; 
     render();
   });
 
   autoDrawArrayTilingButton.addEventListener('click', () => {
-    drawingMode = DrawingMode.ArrayTiling; 
+    configuration.drawingMode = DrawingMode.ArrayTiling; 
     render();
   });
 
   let foregroundToBackgroundButton = document.getElementById('foregroundToBackgroundButton');
   foregroundToBackgroundButton.addEventListener('click', () => {
-    backgroundColor = foregroundColor.clone();
+    configuration.backgroundColor = configuration.foregroundColor.clone();
     updateBackgroundColorPreview();
   });
 
   let backgroundToForegroundButton = document.getElementById('backgroundToForegroundButton');
   backgroundToForegroundButton.addEventListener('click', () => {
-    selectColor(backgroundColor.clone());
+    selectColor(configuration.backgroundColor.clone());
   });
 
   wedgeCountBox.addEventListener('input', e => {
     assertIntegerGreaterThan(wedgeCountBox, 1, value => {
-      wedgeCount = value;
+      configuration.wedgeCount = value;
       updateRotationalMirroringAxes();
       render();
     });
   });
 
   rotationOffsetBox.addEventListener('input', e => {
-    rotationOffset = parseFloat(rotationOffsetBox.value);
+    configuration.rotationOffset = parseFloat(rotationOffsetBox.value);
     updateRotationalMirroringAxes();
     render();
   });
 
   tileWidthBox.addEventListener('input', e => {
     assertIntegerGreaterThan(tileWidthBox, 0, value => {
-      tileSize.x = value;
+      configuration.tileSize.x = value;
       updateArrayTilingGrid();
       render();
     });
@@ -2175,7 +2242,7 @@ function registerCallbacks() {
 
   tileHeightBox.addEventListener('input', e => {
     assertIntegerGreaterThan(tileHeightBox, 0, value => {
-      tileSize.y = value;
+      configuration.tileSize.y = value;
       updateArrayTilingGrid();
       render();
     });
@@ -2183,7 +2250,7 @@ function registerCallbacks() {
 
   gridCellWidthBox.addEventListener('input', e => {
     assertIntegerGreaterThan(gridCellWidthBox, 0, value => {
-      gridCellSize.x = value;
+      configuration.gridCellSize.x = value;
       updateGrid();
       render();
     });
@@ -2191,21 +2258,21 @@ function registerCallbacks() {
 
   gridCellHeightBox.addEventListener('input', e => {
     assertIntegerGreaterThan(gridCellHeightBox, 0, value => {
-      gridCellSize.y = value;
+      configuration.gridCellSize.y = value;
       updateGrid();
       render();
     });
   });
 
   isGridShownBox.addEventListener('click', e => {
-    isGridShown = isGridShownBox.checked;
+    configuration.isGridShown = isGridShownBox.checked;
     render();
   });
 
   let outlineFourButton = document.getElementById('outlineFourButton');
   outlineFourButton.addEventListener('click', e => {
     history.begin(new UndoableImage());
-    image.outline4(backgroundColor, foregroundColor);
+    image.outline4(configuration.backgroundColor, configuration.foregroundColor);
     imageTexture.upload();
     render();
     history.current.newImage = image.clone();
@@ -2268,7 +2335,7 @@ function registerCallbacks() {
   let autocropButton = document.getElementById('autocropButton');
   autocropButton.addEventListener('click', e => {
     history.begin(new UndoableImage());
-    image.autocrop(backgroundColor);
+    image.autocrop(configuration.backgroundColor);
 
     updateArrayTilingGrid();
     updateGrid();
@@ -2283,7 +2350,7 @@ function registerCallbacks() {
 }
 
 function updateBackgroundColorPreview() {
-  backgroundColorPreview.style['background-color'] = `rgb(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b})`;
+  backgroundColorPreview.style['background-color'] = `rgb(${configuration.backgroundColor.r}, ${configuration.backgroundColor.g}, ${configuration.backgroundColor.b})`;
 }
 
 function activateTool(div) {
@@ -2296,32 +2363,32 @@ function activateTool(div) {
 }
 
 function rememberColor() {
-  ipcRenderer.send('remember-color', foregroundColor.values);
+  ipcRenderer.send('remember-color', configuration.foregroundColor.values);
 }
 
 function nameColor() {
   let name = dialogs.prompt('Name this color:', name => {
     if (name) {
-      ipcRenderer.send('name-color', name, foregroundColor.values);
+      ipcRenderer.send('name-color', name, configuration.foregroundColor.values);
     }
   });
 }
 
 function syncColorSwatch() {
-  colorPreview.style['background-color'] = `rgb(${foregroundColor.r}, ${foregroundColor.g}, ${foregroundColor.b})`;
+  colorPreview.style['background-color'] = `rgb(${configuration.foregroundColor.r}, ${configuration.foregroundColor.g}, ${configuration.foregroundColor.b})`;
 }
 
 function syncWidgetsToColor() {
   syncColorSwatch();
 
   for (let [i, widget] of rgbWidgets.entries()) {
-    widget.slider.value = foregroundColor.values[i];
-    widget.box.value = foregroundColor.values[i];
+    widget.slider.value = configuration.foregroundColor.values[i];
+    widget.box.value = configuration.foregroundColor.values[i];
   }
 }
 
 function syncHsv() {
-  let hsv = foregroundColor.toHsv();
+  let hsv = configuration.foregroundColor.toHsv();
 
   // This approach yields 100 instead of 100.0.
   let hsvRounded = [
@@ -2340,16 +2407,16 @@ function syncHsv() {
 
 function initializeRgbWidget(i, slider, box) {
   syncColorSwatch();
-  box.value = foregroundColor.values[i];
-  slider.value = foregroundColor.values[i];
+  box.value = configuration.foregroundColor.values[i];
+  slider.value = configuration.foregroundColor.values[i];
 
   slider.addEventListener('input', e => {
-    foregroundColor.values[i] = parseInt(slider.value);
-    box.value = foregroundColor.values[i];
+    configuration.foregroundColor.values[i] = parseInt(slider.value);
+    box.value = configuration.foregroundColor.values[i];
 
     if (i < 3 && isShift) {
-      foregroundColor.values[(i + 1) % 3] = foregroundColor.values[i];
-      foregroundColor.values[(i + 2) % 3] = foregroundColor.values[i];
+      configuration.foregroundColor.values[(i + 1) % 3] = configuration.foregroundColor.values[i];
+      configuration.foregroundColor.values[(i + 2) % 3] = configuration.foregroundColor.values[i];
     }
 
     syncColorSwatch();
@@ -2365,8 +2432,8 @@ function initializeRgbWidget(i, slider, box) {
 
   box.addEventListener('input', () => {
     if (integerPattern.test(box.value)) {
-      foregroundColor.values[i] = parseInt(box.value);
-      slider.value = foregroundColor.values[i];
+      configuration.foregroundColor.values[i] = parseInt(box.value);
+      slider.value = configuration.foregroundColor.values[i];
       syncColorSwatch();
     }
   });
@@ -2405,9 +2472,9 @@ function syncColorToHsv() {
   ];
   let rgb = hsvToRgb(hsv[0], hsv[1], hsv[2]);
 
-  foregroundColor.r = rgb[0];
-  foregroundColor.g = rgb[1];
-  foregroundColor.b = rgb[2];
+  configuration.foregroundColor.r = rgb[0];
+  configuration.foregroundColor.g = rgb[1];
+  configuration.foregroundColor.b = rgb[2];
   syncColorSwatch();
   syncWidgetsToColor();
 }
@@ -2468,7 +2535,7 @@ function render() {
     gl.uniformMatrix4fv(outlineModelviewUniform, false, modelview.toBuffer());
     gl.uniform4f(outlineColorUniform, 0.0, 0.0, 0.0, 1.0);
 
-    if (isGridShown) {
+    if (configuration.isGridShown) {
       gl.uniform4f(outlineColorUniform, 0.0, 0.0, 0.0, 1.0);
       gl.uniform1f(outlineScaleUniform, 0.002 / scale);
       gl.bindVertexArray(gridVao);
@@ -2480,12 +2547,12 @@ function render() {
     gl.bindVertexArray(borderVao);
     gl.drawElements(gl.TRIANGLES, 4 * 6, gl.UNSIGNED_SHORT, 0);
 
-    if (drawingMode == DrawingMode.RotationalMirroring) {
+    if (configuration.drawingMode == DrawingMode.RotationalMirroring) {
       gl.uniform4f(outlineColorUniform, 0.0, 0.5, 1.0, 1.0);
       gl.uniform1f(outlineScaleUniform, 0.002 / scale);
       gl.bindVertexArray(rotationalMirroringAxesVao);
-      gl.drawElements(gl.TRIANGLES, wedgeCount * 6, gl.UNSIGNED_SHORT, 0);
-    } else if (drawingMode == DrawingMode.ArrayTiling) {
+      gl.drawElements(gl.TRIANGLES, configuration.wedgeCount * 6, gl.UNSIGNED_SHORT, 0);
+    } else if (configuration.drawingMode == DrawingMode.ArrayTiling) {
       gl.uniform4f(outlineColorUniform, 1.0, 0.5, 0.0, 1.0);
       gl.uniform1f(outlineScaleUniform, 0.002 / scale);
       gl.bindVertexArray(arrayTilingGridVao);
@@ -2606,6 +2673,7 @@ function saveImage(path) {
     }
   }).toFile(imagePath, error => {
     isDirty = false;
+    saveConfiguration();
     console.log("error:", error);
   });
 }
@@ -2723,6 +2791,18 @@ ipcRenderer.on('update-color-palette', function(event, palette) {
     colorPaletteRoot.appendChild(entry);
   }
 });
+
+function saveConfiguration() {
+  let json = JSON.stringify(configuration, null, 2);
+  fs.writeFileSync(preferencesPath, json, 'utf8');
+}
+
+// Should I save the configuration in the renderer process, or in the main
+// process? If I save it here, less volley.
+function onPossibleClose() {
+  saveConfiguration();
+  return isDirty;
+}
 
 window.addEventListener('load', onReady);
 window.addEventListener('resize', onSize, false);

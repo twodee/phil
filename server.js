@@ -4,7 +4,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 // https://sharp.dimens.io
 
-let preferencesPath;
+let colorsPath;
 let colorHistory = [];
 let colorPalette = [];
 let argv;
@@ -207,7 +207,7 @@ function loadImage(image) {
 }
 
 function checkDirty(browser) {
-  browser.webContents.executeJavaScript('isDirty').then(isDirty => {
+  browser.webContents.executeJavaScript('onPossibleClose()').then(isDirty => {
     if (isDirty) {
       let options = {
         type: 'question',
@@ -242,10 +242,10 @@ app.on('ready', () => {
   }
 
   createMenu();
-  preferencesPath = require('os').homedir() + '/.phil.json';
+  colorsPath = require('os').homedir() + '/.phil.colors.json';
 
-  if (fs.existsSync(preferencesPath)) {
-    fs.readFile(preferencesPath, 'utf8', (error, data) => {
+  if (fs.existsSync(colorsPath)) {
+    fs.readFile(colorsPath, 'utf8', (error, data) => {
       if (error) {
         console.error(error);
       } else {
@@ -270,7 +270,7 @@ app.on('will-quit', () => {
     colorPalette: colorPalette,
   };
   let json = JSON.stringify(prefs, null, 2);
-  fs.writeFileSync(preferencesPath, json, 'utf8');
+  fs.writeFileSync(colorsPath, json, 'utf8');
 });
 
 ipcMain.on('remember-color', (event, color) => {
