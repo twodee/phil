@@ -84,6 +84,10 @@ body {
   cursor: url(images/eraser.png) 13 13, crosshair;
 }
 
+#canvas.rectangleHovered {
+  cursor: url(images/rectangle.png) 13 13, crosshair;
+}
+
 .panelHeader {
   font-family: sans-serif;
   margin-bottom: 1em;

@@ -125,6 +125,7 @@ Tool.Dropper = 1;
 Tool.Bucket = 2;
 Tool.Syringe = 3;
 Tool.Eraser = 4;
+Tool.Rectangle = 5;
 
 let preferencesPath = require('os').homedir() + '/.phil.json';
 let isDirty;
@@ -1903,11 +1904,7 @@ function onMouseMove(e) {
 }
 
 function syncCursor(mousePosition) {
-  canvas.classList.remove('pencilHovered');
-  canvas.classList.remove('bucketHovered');
-  canvas.classList.remove('dropperHovered');
-  canvas.classList.remove('syringeHovered');
-  canvas.classList.remove('eraserHovered');
+  canvas.classList.remove('pencilHovered', 'bucketHovered', 'dropperHovered', 'syringeHovered', 'eraserHovered', 'rectangleHovered');
 
   if (mousePosition && isOverImage(mousePosition)) {
     if (configuration.activeTool == Tool.Pencil) {
@@ -1920,6 +1917,8 @@ function syncCursor(mousePosition) {
       canvas.classList.add('syringeHovered');
     } else if (configuration.activeTool == Tool.Eraser) {
       canvas.classList.add('eraserHovered');
+    } else if (configuration.activeTool == Tool.Rectangle) {
+      canvas.classList.add('rectangleHovered');
     }
   }
 }
@@ -2086,6 +2085,7 @@ function registerCallbacks() {
   tools[Tool.Bucket] = document.getElementById('bucket');
   tools[Tool.Syringe] = document.getElementById('syringe');
   tools[Tool.Eraser] = document.getElementById('eraser');
+  tools[Tool.Rectangle] = document.getElementById('rectangle');
 
   activateTool(configuration.activeTool);
   for (let iTool = 0; iTool < tools.length; ++iTool) {
@@ -2110,6 +2110,8 @@ function registerCallbacks() {
       activateTool(Tool.Syringe);
     } else if (e.key == 'e') {
       activateTool(Tool.Eraser);
+    } else if (e.key == 'r') {
+      activateTool(Tool.Rectangle);
     } else if (e.key == '[') {
       history.undoMostRecent();
     } else if (e.key == ']') {
