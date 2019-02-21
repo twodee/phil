@@ -143,6 +143,7 @@ let outlineModelviewUniform;
 let outlineColorUniform;
 let outlineScaleUniform;
 
+let selectionIndexBuffer;
 let borderIndexBuffer;
 let gridIndexBuffer;
 let arrayTilingIndexBuffer;
@@ -159,6 +160,10 @@ let gridLineCount;
 // Border
 let borderVao;
 let borderVbo;
+
+// Selection
+let selectionVao;
+let selectionVbo;
 
 // Rotational mirroring
 let rotationalMirroringAxesVao;
@@ -181,6 +186,8 @@ let tileHeightBox;
 // Tools
 let pendingTool = null;
 let pixelCoordinatesBox;
+let rectangleStart = null;
+let rectangleStop = null;
 
 // Undos
 let undosList;
@@ -1304,6 +1311,13 @@ void main() {
   linesColorUniform = gl.getUniformLocation(linesProgram, 'color');
 }
 
+function createSelectionOutline() {
+  selectionVao = gl.createVertexArray();
+  gl.bindVertexArray(selectionVao);
+  selectionVbo = gl.createBuffer();
+  // updateSelectionOutline();
+}
+
 function createBorder() {
   borderVao = gl.createVertexArray();
   gl.bindVertexArray(borderVao);
@@ -1524,6 +1538,81 @@ function updateGrid() {
   gridIndexBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gridIndexBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+}
+
+function updateSelectionOutline() {
+  let vertices = [];
+
+  let away = Math.sqrt(2);
+
+  // Inner
+
+  let l = Math.min(rectangleStart.x, rectangleStop.x);
+  let r = Math.max(rectangleStart.x, rectangleStop.x);
+  let b = Math.min(rectangleStart.y, rectangleStop.y);
+  let t = Math.max(rectangleStart.y, rectangleStop.y);
+
+  // Bottom left
+  vertices.push(l, b, 0, 1);
+  vertices.push(0, 0);
+
+  // Bottom right
+  vertices.push(r, b, 0, 1);
+  vertices.push(0, 0);
+
+  // Top right
+  vertices.push(r, t, 0, 1);
+  vertices.push(0, 0);
+
+  // Top left
+  vertices.push(l, t, 0, 1);
+  vertices.push(0, 0);
+
+  // Outer
+
+  // Bottom left
+  vertices.push(l, b, 0, 1);
+  vertices.push(-away, -away);
+
+  // Bottom right
+  vertices.push(r, b, 0, 1);
+  vertices.push(away, -away);
+
+  // Top right
+  vertices.push(r, t, 0, 1);
+  vertices.push(away, away);
+
+  // Top left
+  vertices.push(l, t, 0, 1);
+  vertices.push(-away, away);
+
+  let indices = [
+    0, 5, 1,
+    0, 4, 5,
+    1, 6, 2,
+    1, 5, 6,
+    2, 7, 3,
+    2, 6, 7,
+    3, 4, 0,
+    3, 7, 4,
+  ];
+
+  gl.bindVertexArray(selectionVao);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, selectionVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+  selectionIndexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, selectionIndexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+  let positionAttributeLocation = gl.getAttribLocation(outlineProgram, 'position');
+  gl.vertexAttribPointer(positionAttributeLocation, 4, gl.FLOAT, false, 24, 0);
+  gl.enableVertexAttribArray(positionAttributeLocation);
+
+  let offsetAttributeLocation = gl.getAttribLocation(outlineProgram, 'offset');
+  gl.vertexAttribPointer(offsetAttributeLocation, 2, gl.FLOAT, false, 24, 16);
+  gl.enableVertexAttribArray(offsetAttributeLocation);
 }
 
 function updateBorder() {
@@ -1786,6 +1875,13 @@ function onMouseDown(e) {
         selectColor(image.get(mouseImage.x, mouseImage.y));
       }
     }
+
+    else if (configuration.activeTool == Tool.Rectangle) {
+      rectangleStart = new Vector2(mouseObject[0], mouseObject[1]);
+      rectangleStop = new Vector2(mouseObject[0], mouseObject[1]);
+      updateSelectionOutline();
+      render();
+    }
   }
 }
 
@@ -1827,6 +1923,9 @@ function onMouseUp(e) {
         rememberColor();
         render();
       }
+    } else if (configuration.activeTool == Tool.Rectangle) {
+      rectangleStart = null;
+      rectangleStop = null;
     }
   }
 
@@ -1889,6 +1988,12 @@ function onMouseMove(e) {
       if (isOverImage(mouseScreen)) {
         selectColor(image.get(newMouseImage.x, newMouseImage.y));
       }
+    }
+
+    else if (configuration.activeTool == Tool.Rectangle) {
+      rectangleStop = new Vector2(newMouseObject[0], newMouseObject[1]);
+      updateSelectionOutline();
+      render();
     }
   } else if (e.which == 3) {
     let diff = newMouseScreen.subtract(mouseScreen);
@@ -1984,6 +2089,7 @@ function onReady() {
   createRotationalMirroringAxes();
   createGrid();
   createBorder();
+  createSelectionOutline();
 
   render();
 
@@ -2556,6 +2662,13 @@ function render() {
     gl.uniform4f(outlineColorUniform, 0.0, 0.0, 0.0, 1.0);
     gl.bindVertexArray(borderVao);
     gl.drawElements(gl.TRIANGLES, 4 * 6, gl.UNSIGNED_SHORT, 0);
+
+    if (rectangleStart && rectangleStop) {
+      gl.uniform1f(outlineScaleUniform, 0.02 / scale);
+      gl.uniform4f(outlineColorUniform, 0.0, 1.0, 0.0, 1.0);
+      gl.bindVertexArray(selectionVao);
+      gl.drawElements(gl.TRIANGLES, 4 * 6, gl.UNSIGNED_SHORT, 0);
+    }
 
     if (configuration.drawingMode == DrawingMode.RotationalMirroring) {
       gl.uniform4f(outlineColorUniform, 0.0, 0.5, 1.0, 1.0);
