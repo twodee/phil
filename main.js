@@ -69,14 +69,14 @@ function createMenu() {
           label: 'Reload',
           accelerator: 'CommandOrControl+R',
           click(item, focusedWindow) {
-            focusedWindow.reload();
+            checkDirty(focusedWindow, () => focusedWindow.reload());
           },
         },
         {
           label: 'Force Reload',
           accelerator: 'CommandOrControl+Shift+R',
           click(item, focusedWindow) {
-            focusedWindow.webContents.reloadIgnoringCache();
+            checkDirty(focusedWindow, () => focusedWindow.webContents.reloadIgnoringCache());
           },
         },
         {
@@ -172,13 +172,19 @@ function newWindow() {
     browser.webContents.send('update-color-palette', colorPalette);
   });
 
+  browser.webContents.on('devtools-reload-page', () => {
+    console.log("ack!!!!");
+  });
+
   browser.on('close', e => {
     e.preventDefault();
-    checkDirty(browser);
+    checkDirty(browser, () => {
+      browser.destroy();
+    });
   });
 }
 
-function checkDirty(browser) {
+function checkDirty(browser, onDiscard) {
   browser.webContents.executeJavaScript('onPossibleClose()').then(isDirty => {
     if (isDirty) {
       let options = {
@@ -190,10 +196,10 @@ function checkDirty(browser) {
       };
       let choice = dialog.showMessageBox(browser, options);
       if (choice == 1) {
-        browser.destroy();
+        onDiscard();
       }
     } else {
-      browser.destroy();
+      onDiscard();
     }
   });
 }
