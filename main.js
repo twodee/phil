@@ -140,70 +140,38 @@ function createWindow() {
   if (argv._.length == 2 && Number.isInteger(argv._[0]) && Number.isInteger(argv._[1])) {
     let width = parseInt(argv._[0]);
     let height = parseInt(argv._[1]);
-    let image = sharp({
-      create: {
-        width: width,
-        height: height,
-        channels: 4,
-        background: { r: argv.background[0], g: argv.background[1], b: argv.background[2], alpha: argv.background[3] },
-      }
-    });
-    images.push({ path: null, sharp: image });
-  } else {
+    newWindow(width, height);
+  } else if (argv._.length > 0) {
     for (let path of argv._) {
-      images.push({ path: path, sharp: sharp(path.toString()) });
+      newWindow(path);
     }
-  }
-
-  if (images.length == 0) {
+  } else {
     console.error("Usage: npm start -- path");
     console.error("       npm start -- width height");
     process.exit(0);
   }
-
-  for (let image of images) {
-    loadImage(image);
-  }
 }
 
-function loadImage(image) {
-  image.sharp
-    .raw()
-    .metadata()
-    .then(meta => {
-      if (meta.channels == 3) {
-        image = image.joinChannel(Buffer.alloc(meta.width * meta.height, 255), {
-          raw: {
-            width: meta.width,
-            height: meta.height,
-            channels: 1
-          }
-        })
-      }
+function newWindow() {
+  let browser = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: { nodeIntegration: true },
+  });
+  browser.loadFile('index.html');
 
-      image.sharp.toBuffer((error, data, info) => {
-        var browser = new BrowserWindow({
-          width: 800,
-          height: 600,
-          webPreferences: { nodeIntegration: true },
-        });
+  browser.webContents.on('dom-ready', () => {
+    if (arguments.length == 1) {
+      browser.webContents.send('openImage', arguments[0]);
+    } else {
+      browser.webContents.send('newImage', arguments[0], arguments[1]);
+    }
+    browser.webContents.send('update-color-palette', colorPalette);
+  });
 
-        browser.loadFile('index.html');
-        // browser.webContents.openDevTools({mode: 'bottom'});
-
-        browser.webContents.on('did-finish-load', () => {
-          browser.webContents.send('loadImage', image.path, info.width, info.height, info.channels, data);
-          browser.webContents.send('update-color-palette', colorPalette);
-        });
-
-        browser.on('close', e => {
-          e.preventDefault();
-          checkDirty(browser);
-        });
-      });
-    })
-  .catch(e => {
-    console.error(e);
+  browser.on('close', e => {
+    e.preventDefault();
+    checkDirty(browser);
   });
 }
 

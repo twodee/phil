@@ -524,7 +524,7 @@ void main() {
   ]);
 
   gl.activeTexture(gl.TEXTURE0);
-  backgroundTexture = createTexture(gl, 2, 2, 4, checker);
+  backgroundTexture = Texture.createTexture(2, 2, 4, checker);
 
   backgroundTextureUniform = gl.getUniformLocation(backgroundProgram, 'backgroundTexture');
   resolutionUniform = gl.getUniformLocation(backgroundProgram, 'resolution');
@@ -1895,15 +1895,6 @@ function initializeHsvWidget(i, slider, box) {
   });
 }
 
-function createTexture(gl, width, height, nchannels, pixels) {
-  let texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, nchannels == 4 ? gl.RGBA : gl.RGB, gl.UNSIGNED_BYTE, pixels);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  return texture;
-}
-
 function render() {
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearColor(0, 0, 0, 1);
@@ -2023,19 +2014,61 @@ function updateProjection() {
   }
 }
 
-function loadImage(path, width, height, nchannels, pixels) {
-  imagePath = path;
-  image = new Image(width, height, nchannels, pixels);
-  history = new UndoHistory(image.clone());
-  updateProjection();
-  gl.activeTexture(gl.TEXTURE1);
-  imageTexture = new Texture(image);
+function newImage(width, height) {
+  loadImage({
+    path: null,
+    sharp: sharp({
+      create: {
+        width: width,
+        height: height,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      }
+    }),
+  });
+}
 
-  updateArrayTilingGrid();
-  updateGrid();
+function openImage(path) {
+  loadImage({
+    path: path,
+    sharp: sharp(path.toString()),
+  });
+}
 
-  render();
-  syncResizeButton();
+function loadImage(loader) {
+  loader.sharp
+    .raw()
+    .metadata()
+    .then(meta => {
+      // if (meta.channels == 3) {
+        // image = image.joinChannel(Buffer.alloc(meta.width * meta.height, 255), {
+          // raw: {
+            // width: meta.width,
+            // height: meta.height,
+            // channels: 1
+          // }
+        // })
+      // }
+
+      loader.sharp.toBuffer({resolveWithObject: true}).then(({ data, info }) => {
+        let pixels = Uint8Array.from(data); // Node's buffers aren't compatible with WebGL. :(
+        imagePath = loader.path;
+        image = new Image(info.width, info.height, info.channels, pixels);
+        history = new UndoHistory(image.clone());
+        updateProjection();
+        gl.activeTexture(gl.TEXTURE1);
+        imageTexture = new Texture(image);
+
+        updateArrayTilingGrid();
+        updateGrid();
+
+        render();
+        syncResizeButton();
+      });
+    })
+  .catch(e => {
+    console.error(e);
+  });
 }
 
 function isFloat(text) {
@@ -2087,8 +2120,12 @@ function saveImage(path) {
   });
 }
 
-require('electron').ipcRenderer.on('loadImage', (event, path, width, height, nchannels, pixels) => {
-  loadImage(path, width, height, nchannels, pixels);
+require('electron').ipcRenderer.on('newImage', (event, width, height) => {
+  newImage(width, height);
+});
+
+require('electron').ipcRenderer.on('openImage', (event, path) => {
+  openImage(path);
 });
 
 let saveAsPath;
