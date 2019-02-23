@@ -183,7 +183,7 @@ function checkDirty(browser) {
     if (isDirty) {
       let options = {
         type: 'question',
-        defaultId: 1,
+        defaultId: 0,
         buttons: ['Wait', 'Discard Changes'],
         title: 'Confirm',
         message: 'You have unsaved changes. Discard them?',

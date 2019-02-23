@@ -1492,28 +1492,31 @@ function registerCallbacks() {
   window.addEventListener('mouseup', onMouseUp);
 
   window.addEventListener('keydown', e => {
-    if (e.key == 'p') {
-      activateTool(Tool.Pencil);
-    } else if (e.key == 'd') {
-      activateTool(Tool.Dropper);
-    } else if (e.key == 'b') {
-      activateTool(Tool.Bucket);
-    } else if (e.key == 's') {
-      activateTool(Tool.Syringe);
-    } else if (e.key == 'e') {
-      activateTool(Tool.Eraser);
-    } else if (e.key == 'r') {
-      activateTool(Tool.Rectangle);
-    } else if (e.key == '[') {
-      history.undoMostRecent();
-    } else if (e.key == ']') {
-      history.redoMostRecent();
+    let hasModifier = e.altKey || e.ctrlKey || e.metaKey || e.shiftKey;
+    if (!hasModifier) {
+      if (e.key == 'p') {
+        activateTool(Tool.Pencil);
+      } else if (e.key == 'd') {
+        activateTool(Tool.Dropper);
+      } else if (e.key == 'b') {
+        activateTool(Tool.Bucket);
+      } else if (e.key == 's') {
+        activateTool(Tool.Syringe);
+      } else if (e.key == 'e') {
+        activateTool(Tool.Eraser);
+      } else if (e.key == 'r') {
+        activateTool(Tool.Rectangle);
+      } else if (e.key == '[') {
+        history.undoMostRecent();
+      } else if (e.key == ']') {
+        history.redoMostRecent();
+      } else if (e.key == 'z' && pendingTool == null) {
+        hotDrop(mouseImage);
+        pendingTool = configuration.activeTool;
+        activateTool(Tool.Dropper);
+      }
     } else if (e.key == 'Shift') {
       isShift = true;
-    } else if (e.key == 'z' && pendingTool == null) {
-      hotDrop(mouseImage);
-      pendingTool = configuration.activeTool;
-      activateTool(Tool.Dropper);
     }
   });
 
