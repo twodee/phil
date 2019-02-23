@@ -1,8 +1,8 @@
 const sharp = require('sharp');
-const { ipcRenderer } = require('electron')
-const fsdialog = require('electron').remote.dialog;
 const fs = require('fs');
 const Dialogs = require('dialogs');
+const { ipcRenderer, remote } = require('electron')
+const { dialog } = remote;
 const { Color, Image, Matrix4, Vector2, Texture } = require('./twodee');
 let dialogs = Dialogs();
 
@@ -2140,7 +2140,7 @@ function saveAs() {
     defaultPath = 'untitled.png';
   }
 
-  fsdialog.showSaveDialog({
+  dialog.showSaveDialog({
     title: 'Save as...',
     defaultPath: defaultPath,
   }, function(path) {
@@ -2150,7 +2150,7 @@ function saveAs() {
         imagePath = saveAsPath;
         saveImage(imagePath);
       } else {
-        fsdialog.showMessageBox({
+        dialog.showMessageBox({
           message: `The file must have a .png or .jpg extension. ${path} does not.`,
         }, () => {
           saveAs();

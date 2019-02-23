@@ -33,6 +33,9 @@ function createMenu() {
           },
         },
         {
+          role: 'close'
+        },
+        {
           type: 'separator'
         },
         {
@@ -180,13 +183,13 @@ function checkDirty(browser) {
     if (isDirty) {
       let options = {
         type: 'question',
-        buttons: ['Yes', 'No'],
+        defaultId: 1,
+        buttons: ['Wait', 'Discard Changes'],
         title: 'Confirm',
-        message: 'You have unsaved changes. Are you sure you want to quit?'
-      }
+        message: 'You have unsaved changes. Discard them?',
+      };
       let choice = dialog.showMessageBox(browser, options);
-
-      if (choice == 0) {
+      if (choice == 1) {
         browser.destroy();
       }
     } else {
