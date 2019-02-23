@@ -172,10 +172,6 @@ function newWindow() {
     browser.webContents.send('update-color-palette', colorPalette);
   });
 
-  browser.webContents.on('devtools-reload-page', () => {
-    console.log("ack!!!!");
-  });
-
   browser.on('close', e => {
     e.preventDefault();
     checkDirty(browser, () => {
