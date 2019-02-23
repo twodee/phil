@@ -1,4 +1,5 @@
 const { app, Menu, BrowserWindow, ipcMain, dialog } = require('electron');
+const { Image, } = require('./twodee');
 const minimist = require('minimist');
 const fs = require('fs');
 const sharp = require('sharp');
