@@ -82,6 +82,7 @@ let pendingTool = null;
 let pixelCoordinatesBox;
 let rectangleStart = null;
 let rectangleStop = null;
+let isSelectionAnchored = [false, false];
 
 // Undos
 let undosList;
@@ -131,6 +132,7 @@ let inverseProjection;
 let imagePath;
 let image;
 let mouseScreen;
+let mouseObject;
 let mouseImage;
 
 let isShift;
@@ -1139,7 +1141,7 @@ function drawLine(from, to, color) {
 
 function onMouseDown(e) {
   mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
-  let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
+  mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
   mouseImage = objectToImage(mouseObject);
 
   if (e.which == 1) {
@@ -1163,8 +1165,11 @@ function onMouseDown(e) {
     }
 
     else if (configuration.activeTool == Tool.Rectangle) {
+      isSelectionAnchored[0] = false;
+      isSelectionAnchored[1] = false;
       rectangleStart = new Vector2(mouseObject[0], mouseObject[1]);
       rectangleStop = new Vector2(mouseObject[0], mouseObject[1]);
+
       updateSelectionOutline();
       render();
     }
@@ -1187,7 +1192,7 @@ function onMouseUp(e) {
   if (e.target == canvas) {
     if (configuration.activeTool == Tool.Bucket) {
       mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
-      let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
+      mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
       mouseImage = objectToImage(mouseObject);
 
       if (isOverImage(mouseImage)) {
@@ -1199,7 +1204,7 @@ function onMouseUp(e) {
       }
     } else if (configuration.activeTool == Tool.Syringe) {
       mouseScreen = new Vector2(e.clientX, gl.canvas.height - 1 - e.clientY);
-      let mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
+      mouseObject = screenToObject(mouseScreen.x, mouseScreen.y);
       mouseImage = objectToImage(mouseObject);
 
       if (isOverImage(mouseImage)) {
@@ -1210,6 +1215,21 @@ function onMouseUp(e) {
         render();
       }
     } else if (configuration.activeTool == Tool.Rectangle) {
+      if (mouseObject[0] > rectangleStart.x) {
+        rectangleStop.x = (mouseImage.x + 1) / image.width * 2 - 1;
+      } else if (mouseObject[0] < rectangleStart.x) {
+        rectangleStop.x = (mouseImage.x + 0) / image.width * 2 - 1;
+      }
+
+      if (mouseObject[1] > rectangleStart.y) {
+        rectangleStop.y = (mouseImage.y + 0) / image.height * -2 + 1;
+      } else if (mouseObject[1] < rectangleStart.y) {
+        rectangleStop.y = (mouseImage.y + 1) / image.height * -2 + 1;
+      }
+
+      updateSelectionOutline();
+      render();
+
       rectangleStart = null;
       rectangleStop = null;
     }
@@ -1278,6 +1298,32 @@ function onMouseMove(e) {
 
     else if (configuration.activeTool == Tool.Rectangle) {
       rectangleStop = new Vector2(newMouseObject[0], newMouseObject[1]);
+
+      // if moving s, round n
+      // if moving n, round s
+      // if moving e, round w
+      // if moving w, round e
+ 
+      if (!isSelectionAnchored[0]) {
+        if (newMouseObject[0] > mouseObject[0]) {
+          rectangleStart.x = mouseImage.x / image.width * 2 - 1;
+          isSelectionAnchored[0] = true;
+        } else if (newMouseObject[0] < mouseObject[0]) {
+          rectangleStart.x = (mouseImage.x + 1) / image.width * 2 - 1;
+          isSelectionAnchored[0] = true;
+        }
+      }
+ 
+      if (!isSelectionAnchored[1]) {
+        if (newMouseObject[1] > mouseObject[1]) {
+          rectangleStart.y = (mouseImage.y + 1) / image.height * -2 + 1;
+          isSelectionAnchored[1] = true;
+        } else if (newMouseObject[1] < mouseObject[1]) {
+          rectangleStart.y = (mouseImage.y + 0) / image.height * -2 + 1;
+          isSelectionAnchored[1] = true;
+        }
+      }
+
       updateSelectionOutline();
       render();
     }
@@ -1291,6 +1337,7 @@ function onMouseMove(e) {
   }
 
   mouseScreen = newMouseScreen;
+  mouseObject = newMouseObject;
   mouseImage = newMouseImage;
 }
 
