@@ -2157,17 +2157,47 @@ function syncResizeButton() {
 }
 
 function saveImage(path) {
-  sharp(image.bytes, {
-    raw: {
-      width: image.width,
-      height: image.height,
-      channels: image.nchannels,
-    }
-  }).toFile(imagePath, error => {
-    isDirty = false;
-    saveConfiguration();
-    console.log("error:", error);
-  });
+  if (path.endsWith('.phil')) {
+    let options = {
+      raw: {
+        width: image.width,
+        height: image.height,
+        channels: image.nchannels,
+      }
+    };
+
+    sharp(Buffer.from(image.bytes), options)
+      .png()
+      .toBuffer()
+      .then(data => {
+        let contents = {
+          width: image.width,
+          height: image.height,
+          frames: [
+            {
+              png: data.toString('binary'),
+            }
+          ],
+        };
+        let json = JSON.stringify(contents, null, 2);
+        fs.writeFileSync(path, json, 'utf8');
+        isDirty = false;
+      }).catch(error => {
+        console.log("error:", error);
+      });
+  } else {
+    sharp(Buffer.from(image.bytes), {
+      raw: {
+        width: image.width,
+        height: image.height,
+        channels: image.nchannels,
+      }
+    }).toFile(imagePath, error => {
+      isDirty = false;
+      console.log("error:", error);
+    });
+  }
+  saveConfiguration();
 }
 
 require('electron').ipcRenderer.on('newImage', (event, width, height) => {
@@ -2187,7 +2217,7 @@ function saveAs() {
   } else if (imagePath) {
     defaultPath = imagePath;
   } else {
-    defaultPath = 'untitled.png';
+    defaultPath = 'untitled.phil';
   }
 
   dialog.showSaveDialog({
@@ -2196,12 +2226,12 @@ function saveAs() {
   }, function(path) {
     if (path) {
       saveAsPath = path;
-      if (/\.(png|jpg)$/.test(path)) {
+      if (/\.(png|jpg|phil)$/.test(path)) {
         imagePath = saveAsPath;
         saveImage(imagePath);
       } else {
         dialog.showMessageBox({
-          message: `The file must have a .png or .jpg extension. ${path} does not.`,
+          message: `The file must have a .png, .jpg, or .phil extension. ${path} does not.`,
         }, () => {
           saveAs();
         });
