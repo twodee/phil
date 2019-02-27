@@ -185,6 +185,7 @@ function checkDirty(browser, onDiscard) {
     if (isDirty) {
       let options = {
         type: 'question',
+        cancelId: 1,
         defaultId: 0,
         buttons: ['Wait', 'Discard Changes'],
         title: 'Confirm',
