@@ -2079,10 +2079,20 @@ function newImage(width, height) {
 }
 
 function openImage(path) {
-  loadImage({
-    path: path,
-    sharp: sharp(path.toString()),
-  });
+  if (path.endsWith('.phil')) {
+    let json = fs.readFileSync(path, 'utf8');
+    let object = JSON.parse(json);
+    let png = object.frames[0].png;
+    loadImage({
+      path: path,
+      sharp: sharp(Buffer.from(png, 'binary')),
+    });
+  } else {
+    loadImage({
+      path: path,
+      sharp: sharp(path.toString()),
+    });
+  }
 }
 
 function loadImage(loader) {

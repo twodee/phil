@@ -258,7 +258,7 @@ class Image {
     isDirty = true;
     let newWidth = this.width - l - r;
     let newHeight = this.height - t - b;
-    let newBytes = Buffer.alloc(newWidth * newHeight * 4);
+    let newBytes = new Uint8Array(newWidth * newHeight * 4);
 
     for (let rNew = 0; rNew < newHeight; ++rNew) {
       for (let cNew = 0; cNew < newWidth; ++cNew) {
@@ -266,7 +266,9 @@ class Image {
         let cOld = cNew + l;
         let iOld = 4 * (rOld * this.width + cOld);
         let iNew = 4 * (rNew * newWidth + cNew);
-        this.bytes.copy(newBytes, iNew, iOld, iOld + 4);
+        for (let ci = 0; ci < 4; ++ci) {
+          newBytes[iNew + ci] = this.bytes[iOld + ci];
+        }
       }
     }
 
@@ -279,7 +281,7 @@ class Image {
     isDirty = true;
     let newWidth = this.width + l + r;
     let newHeight = this.height + t + b;
-    let newBytes = Buffer.alloc(newWidth * newHeight * 4);
+    let newBytes = new Uint8Array(newWidth * newHeight * 4);
 
     for (let rOld = 0; rOld < this.height; ++rOld) {
       for (let cOld = 0; cOld < this.width; ++cOld) {
@@ -287,7 +289,9 @@ class Image {
         let cNew = cOld + l;
         let iOld = 4 * (rOld * this.width + cOld);
         let iNew = 4 * (rNew * newWidth + cNew);
-        this.bytes.copy(newBytes, iNew, iOld, iOld + 4);
+        for (let ci = 0; ci < 4; ++ci) {
+          newBytes[iNew + ci] = this.bytes[iOld + ci];
+        }
       }
     }
 
