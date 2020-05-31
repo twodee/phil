@@ -1371,11 +1371,11 @@ function onMouseWheel(e) {
 }
 
 function onReady() {
-  let json = fs.readFileSync(preferencesPath, 'utf8');
-  if (json) {
+  try {
+    let json = fs.readFileSync(preferencesPath, 'utf8');
     let pojo = JSON.parse(json);
     configuration = Configuration.fromPojo(pojo);
-  } else {
+  } catch (e) {
     configuration = new Configuration();
   }
   
