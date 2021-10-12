@@ -6,7 +6,7 @@
     "start": "electron ."
   },
   "devDependencies": {
-    "electron": "^4.0.0",
+    "electron": "^11.5.0",
     "electron-rebuild": "^1.8.2",
     "sharp": "^0.25.2"
   },
